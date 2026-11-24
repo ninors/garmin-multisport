@@ -34,7 +34,11 @@ class ActiveDataView extends WatchUi.View {
         dc.clear();
 
         if (currentPage == 0) {
-            drawPage0MainFR965(dc);
+            if (SportDefinitions.isTransition(manager.getCurrentSport())) {
+                drawTransitionScreen(dc);
+            } else {
+                drawPage0MainFR965(dc);
+            }
         } else if (currentPage == 1) {
             drawPage1SegmentDetail(dc);
         } else if (currentPage == 2) {
@@ -62,6 +66,69 @@ class ActiveDataView extends WatchUi.View {
         GarminComponents.drawGarminOverlay(dc, manager);
     }
 
+    // SPECIAL NATIVE GARMIN TRANSITION SCREEN (Yellow theme + Cumulative & Previous recap)
+    private function drawTransitionScreen(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var cx = w / 2;
+        var seg = manager.getCurrentSegment();
+        var sport = seg.sportType;
+        var transYellow = 0xFFCC00;
+
+        // Top yellow transition header + Material transition icon
+        SportIcons.drawSportIcon(dc, sport, cx - 78, 40, 14, transYellow);
+        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        var tTitle = (sport == SportDefinitions.SPORT_TRANSITION_1) ? "TRANSITION 1" : "TRANSITION 2";
+        dc.drawText(cx + 12, 40, Graphics.FONT_XTINY, tTitle, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Large crisp transition chrono
+        GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 88, Theme.COLOR_WHITE);
+
+        // Signature Garmin Yellow Dividers for Transitions
+        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(16, 132, w - 16, 132);
+        dc.drawLine(16, 256, w - 16, 256);
+        dc.drawLine(cx, 132, cx, 256);
+
+        var leftCx = cx / 2 + 6;
+        var rightCx = cx + (cx / 2) - 6;
+
+        // Middle-Left: Cumulative Multisport Time since start
+        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(leftCx, 156, Graphics.FONT_XTINY, "TPS TOTAL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(leftCx, 206, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Middle-Right: Previous Completed Leg Recap
+        var prevLabel = "PRÉCÉDENT";
+        var prevVal = "--:--";
+        if (manager.currentLegIndex > 0) {
+            var prevSeg = manager.segments[manager.currentLegIndex - 1];
+            prevLabel = SportDefinitions.getSportShortName(prevSeg.sportType);
+            prevVal = SportDefinitions.formatTime(prevSeg.elapsedMs);
+        }
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(rightCx, 156, Graphics.FONT_XTINY, prevLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(rightCx, 206, Graphics.FONT_MEDIUM, prevVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Bottom: Next Sport preview + Material SVG Icon + Live HR
+        var nextSp = manager.getNextSport();
+        if (nextSp != null) {
+            var nColor = SportDefinitions.getSportColor(nextSp as Number);
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, 278, Graphics.FONT_XTINY, "SUIVANT", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            SportIcons.drawSportIcon(dc, nextSp as Number, cx - 54, 314, 14, nColor);
+            dc.setColor(nColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx + 16, 314, Graphics.FONT_SMALL, SportDefinitions.getSportName(nextSp as Number).toUpper(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
+        // Yellow bottom arc accent + live HR
+        var hrStr = (manager.heartRate > 30) ? (manager.heartRate.toString() + " bpm") : "--";
+        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 354, Graphics.FONT_XTINY, hrStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     // PAGE 0: Signature Forerunner 965 Main Screen (4 fields + Red T/Cross dividers + Bottom 5-zone HR arc)
     private function drawPage0MainFR965(dc as Dc) as Void {
         var w = dc.getWidth();
@@ -70,49 +137,39 @@ class ActiveDataView extends WatchUi.View {
         var sport = seg.sportType;
         var sportColor = SportDefinitions.getSportColor(sport);
 
-        // Top: Label "CHRONO" (or Transition badge) + Superscript Hours Chrono
-        var topLabel = SportDefinitions.isTransition(sport)
-            ? ("TRANSITION " + SportDefinitions.getSportShortName(sport))
-            : "CHRONO";
-        dc.setColor(SportDefinitions.isTransition(sport) ? Theme.COLOR_GREEN_RING : Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 34, Theme.fLabel as Graphics.FontType, topLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // Top: Material SVG sport icon + "CHRONO" + Huge Superscript Chrono
+        SportIcons.drawSportIcon(dc, sport, cx - 64, 36, 14, sportColor);
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx + 10, 36, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Small sport dot next to label
-        SportIcons.drawSportIcon(dc, sport, cx - 72, 34, 10, sportColor);
-
-        // Huge Chrono with superscript hours (e.g. ¹08:20)
         GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 84, Theme.COLOR_WHITE);
 
-        // Signature FR965 Thin Red Dividers (#FF0033) in T + Cross shape
+        // Signature FR965 Thin Red Dividers (#FF0033)
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
         dc.drawLine(14, 130, w - 14, 130);
-        dc.drawLine(14, 258, w - 14, 258);
-        dc.drawLine(cx, 130, cx, 258);
+        dc.drawLine(14, 256, w - 14, 256);
+        dc.drawLine(cx, 130, cx, 256);
 
-        // Middle 2 Columns: Customizable per sport (Left: DISTANCE, Right: ALLURE / VITESSE / PUISSANCE)
+        // Middle 2 Columns: Dynamic unit in label so big numbers NEVER overflow!
         var leftField = manager.settings.getFieldLeftForSport(sport);
         var rightField = manager.settings.getFieldRightForSport(sport);
-        if (SportDefinitions.isTransition(sport)) {
-            leftField = SportDefinitions.FIELD_TOTAL_TIME;
-            rightField = SportDefinitions.FIELD_DISTANCE;
-        }
 
-        var leftLabel = SportDefinitions.getFieldLabel(leftField);
-        var rightLabel = SportDefinitions.getFieldLabel(rightField);
+        var leftLabel = getDynamicFieldLabel(leftField, seg);
+        var rightLabel = getDynamicFieldLabel(rightField, seg);
         var leftVal = manager.getFormattedFieldValue(leftField);
         var rightVal = manager.getFormattedFieldValue(rightField);
 
-        var leftCx = cx / 2 + 4;
-        var rightCx = cx + (cx / 2) - 4;
+        var leftCx = (cx / 2) + 8;
+        var rightCx = cx + (cx / 2) - 8;
 
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(leftCx, 154, Theme.fLabel as Graphics.FontType, leftLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(rightCx, 154, Theme.fLabel as Graphics.FontType, rightLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(leftCx, 152, Graphics.FONT_XTINY, leftLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rightCx, 152, Graphics.FONT_XTINY, rightLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(leftCx, 208, Theme.fValueBig as Graphics.FontType, leftVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(rightCx, 208, Theme.fValueBig as Graphics.FontType, rightVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(leftCx, 206, Graphics.FONT_NUMBER_MILD, leftVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rightCx, 206, Graphics.FONT_NUMBER_MILD, rightVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Bottom: Zone-colored Heart + Big HR Value + 5-Zone HR Arc with live white pointer
         var zPos = manager.getHrZonePosition(manager.heartRate);
@@ -120,43 +177,57 @@ class ActiveDataView extends WatchUi.View {
         GarminComponents.drawBottomHrArc(dc, manager.heartRate, zPos, zIdx);
     }
 
-    // PAGE 1: Detailed Current Segment / Lap Data
+    private function getDynamicFieldLabel(fieldId as Number, seg as SegmentData) as String {
+        if (fieldId == SportDefinitions.FIELD_DISTANCE) {
+            var unit = SportDefinitions.getDistanceUnit(seg.distanceMeters, SportDefinitions.isSwim(seg.sportType));
+            return "DIST. (" + unit + ")";
+        } else if (fieldId == SportDefinitions.FIELD_SPEED) {
+            return "VIT. (km/h)";
+        } else if (fieldId == SportDefinitions.FIELD_PACE) {
+            return SportDefinitions.isSwim(seg.sportType) ? "ALL. /100m" : "ALLURE";
+        }
+        return SportDefinitions.getFieldLabel(fieldId);
+    }
+
+    // PAGE 1: Detailed Current Segment / Lap Data (clean native FR965 4-field grid)
     private function drawPage1SegmentDetail(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
         var seg = manager.getCurrentSegment();
         var sport = seg.sportType;
         var sportColor = SportDefinitions.getSportColor(sport);
+        var divColor = SportDefinitions.isTransition(sport) ? 0xFFCC00 : Theme.COLOR_RED_DIVIDER;
 
-        // Header: Sport Icon + Name + Lap #
-        SportIcons.drawSportIcon(dc, sport, cx - 64, 48, 13, sportColor);
+        // Header safely centered inside top circular chord
+        SportIcons.drawSportIcon(dc, sport, cx - 58, 48, 14, sportColor);
         dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 12, 48, Theme.fMedium as Graphics.FontType,
+        dc.drawText(cx + 12, 48, Graphics.FONT_TINY,
             SportDefinitions.getSportShortName(sport) + " T" + seg.lapCount.toString(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Red Cross Grid
-        dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
+        // Clean FR965 Cross Grid
+        dc.setColor(divColor, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        dc.drawLine(24, 82, w - 24, 82);
+        dc.drawLine(28, 82, w - 28, 82);
         dc.drawLine(14, 195, w - 14, 195);
-        dc.drawLine(24, 308, w - 24, 308);
+        dc.drawLine(28, 308, w - 28, 308);
         dc.drawLine(cx, 82, cx, 308);
 
-        var lCx = cx / 2 + 6;
-        var rCx = cx + (cx / 2) - 6;
+        var lCx = (cx / 2) + 8;
+        var rCx = cx + (cx / 2) - 8;
 
         // Top-Left: Segment Time
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(lCx, 106, Theme.fLabel as Graphics.FontType, "TPS SEG.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(lCx, 108, Graphics.FONT_XTINY, "TPS SEG.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(lCx, 148, Theme.fValueMed as Graphics.FontType, SportDefinitions.formatTime(seg.elapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(lCx, 150, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(seg.elapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Top-Right: Segment Distance
+        var distUnit = SportDefinitions.getDistanceUnit(seg.distanceMeters, SportDefinitions.isSwim(sport));
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rCx, 106, Theme.fLabel as Graphics.FontType, "DIST SEG.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rCx, 108, Graphics.FONT_XTINY, "DIST. (" + distUnit + ")", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rCx, 148, Theme.fValueMed as Graphics.FontType, SportDefinitions.formatDistance(seg.distanceMeters, SportDefinitions.isSwim(sport)), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rCx, 150, Graphics.FONT_MEDIUM, SportDefinitions.formatDistance(seg.distanceMeters, SportDefinitions.isSwim(sport)), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Bottom-Left: Avg Pace / Avg Speed
         var avgLbl = SportDefinitions.isBike(sport) ? "VIT. MOY." : "ALL. MOY.";
@@ -164,91 +235,95 @@ class ActiveDataView extends WatchUi.View {
             ? (seg.getAvgSpeedKmh().format("%.1f"))
             : SportDefinitions.formatPaceSecPerUnit(seg.getAvgPaceSec());
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(lCx, 220, Theme.fLabel as Graphics.FontType, avgLbl, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(lCx, 222, Graphics.FONT_XTINY, avgLbl, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(lCx, 264, Theme.fValueMed as Graphics.FontType, avgVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(lCx, 266, Graphics.FONT_MEDIUM, avgVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Bottom-Right: SWOLF (Swim) / Power (Bike if >0) / Cadence
+        // Bottom-Right: SWOLF (Swim) / Cadence
         var fourthLbl = "CADENCE";
         var fourthVal = (manager.cadence > 0) ? manager.cadence.toString() : "--";
         if (SportDefinitions.isSwim(sport)) {
             fourthLbl = "SWOLF";
             var sw = seg.getEstimatedSwolf(manager.settings.poolLengthMeters);
             fourthVal = (sw > 0) ? sw.toString() : "--";
-        } else if (SportDefinitions.isBike(sport) && manager.power > 0) {
-            fourthLbl = "PUISSANCE";
-            fourthVal = manager.power.toString() + "W";
         }
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rCx, 220, Theme.fLabel as Graphics.FontType, fourthLbl, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rCx, 222, Graphics.FONT_XTINY, fourthLbl, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rCx, 264, Theme.fValueMed as Graphics.FontType, fourthVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rCx, 266, Graphics.FONT_MEDIUM, fourthVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Footer: Current Lap Time
         var lapTime = SportDefinitions.formatTime(seg.elapsedMs - manager.lapStartElapsedMs);
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 336, Theme.fSmall as Graphics.FontType, "TOUR : " + lapTime, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 338, Graphics.FONT_XTINY, "TOUR : " + lapTime, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // PAGE 2: Cumulative Multisport Summary
+    // PAGE 2: Clean Native Garmin Multisport Total Recap (safe circular margins, zero clipping!)
     private function drawPage2MultisportRecap(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
 
-        // Global Total Header
+        // Compact header well inside the circular bezel
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 36, Theme.fLabel as Graphics.FontType, "MULTISPORT TOTAL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 44, Graphics.FONT_XTINY, "TOTAL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 74, Theme.fValueMed as Graphics.FontType, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 78, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 108, Theme.fSmall as Graphics.FontType,
-            SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km  •  " + manager.totalCalories.toString() + " kcal",
+        dc.drawText(cx, 108, Graphics.FONT_XTINY,
+            SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        dc.drawLine(34, 128, w - 34, 128);
+        dc.drawLine(46, 126, w - 46, 126);
 
-        // Segment breakdown rows (up to 5 legs)
+        // Clean leg rows centered inside circular safe zone (y = 148..324)
         var maxRows = (manager.segments.size() > 5) ? 5 : manager.segments.size();
-        var startY = 152;
-        var rowH = 40;
+        var startY = 148;
+        var rowH = 42;
         for (var i = 0; i < maxRows; i++) {
             var s = manager.segments[i];
             var y = startY + (i * rowH);
             var isCur = (i == manager.currentLegIndex);
-            var color = isCur ? Theme.COLOR_GREEN_RING : (s.completed ? Theme.COLOR_WHITE : Theme.COLOR_DIM);
+            var sColor = SportDefinitions.getSportColor(s.sportType);
+            var textColor = isCur ? sColor : (s.completed ? Theme.COLOR_WHITE : Theme.COLOR_DIM);
 
-            SportIcons.drawSportIcon(dc, s.sportType, 66, y, 10, SportDefinitions.getSportColor(s.sportType));
-            dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(90, y, Theme.fSmall as Graphics.FontType, SportDefinitions.getSportShortName(s.sportType), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            // Crisp Material SVG icon
+            SportIcons.drawSportIcon(dc, s.sportType, 74, y, 12, sColor);
 
+            // Sport name
+            dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(100, y, Graphics.FONT_XTINY, SportDefinitions.getSportShortName(s.sportType), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+            // Leg elapsed time
             var tStr = (s.completed || isCur) ? SportDefinitions.formatTime(s.elapsedMs) : "--:--";
-            dc.drawText(235, y, Theme.fSmall as Graphics.FontType, tStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(246, y, Graphics.FONT_XTINY, tStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-            var dStr = SportDefinitions.isTransition(s.sportType)
-                ? ""
-                : SportDefinitions.formatDistance(s.distanceMeters, SportDefinitions.isSwim(s.sportType));
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(334, y, Theme.fLabel as Graphics.FontType, dStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            // Leg distance (clean with unit)
+            if (!SportDefinitions.isTransition(s.sportType)) {
+                var u = SportDefinitions.getDistanceUnit(s.distanceMeters, SportDefinitions.isSwim(s.sportType));
+                var dStr = SportDefinitions.formatDistance(s.distanceMeters, SportDefinitions.isSwim(s.sportType)) + u;
+                dc.setColor(isCur ? Theme.COLOR_WHITE : Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(324, y, Graphics.FONT_XTINY, dStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
     }
 
-    // PAGE 3: Live Vector GPS Track on Pure Black
+    // PAGE 3: Clean Live GPS Track Map on Pure Black
     private function drawPage3GpsTrack(dc as Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var cx = w / 2;
         var cy = h / 2;
 
-        // Subtle compass ring
+        // Subtle Garmin compass ring
         dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(1);
-        dc.drawCircle(cx, cy, 148);
+        dc.drawCircle(cx, cy, 134);
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 30, Theme.fLabel as Graphics.FontType, "N", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 38, Graphics.FONT_XTINY, "N", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var count = manager.trackLats.size();
         if (count >= 2) {
@@ -272,17 +347,15 @@ class ActiveDataView extends WatchUi.View {
             }
             var midLat = (minLat + maxLat) / 2.0f;
             var midLon = (minLon + maxLon) / 2.0f;
-            var scale = 220.0f / maxSpan;
+            var scale = 200.0f / maxSpan;
 
-            dc.setColor(SportDefinitions.getSportColor(manager.getCurrentSport()), Graphics.COLOR_TRANSPARENT);
-            dc.setPenWidth(4);
             var prevX = cx + ((manager.trackLons[0] - midLon) * scale).toNumber();
             var prevY = cy - ((manager.trackLats[0] - midLat) * scale).toNumber();
-            // Start dot
             dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
             dc.fillCircle(prevX, prevY, 5);
 
             dc.setColor(SportDefinitions.getSportColor(manager.getCurrentSport()), Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(4);
             for (var j = 1; j < count; j++) {
                 var px = cx + ((manager.trackLons[j] - midLon) * scale).toNumber();
                 var py = cy - ((manager.trackLats[j] - midLat) * scale).toNumber();
@@ -290,88 +363,66 @@ class ActiveDataView extends WatchUi.View {
                 prevX = px;
                 prevY = py;
             }
-            // Current position arrow
             drawHeadingArrow(dc, prevX, prevY, manager.heading);
 
-            // Dynamic scale bar (1 deg lat ~ 111,000 m)
-            var metersPerPx = (maxSpan * 111000.0f) / 220.0f;
-            var barMeters = (metersPerPx * 60.0f).toNumber();
+            var metersPerPx = (maxSpan * 111000.0f) / 200.0f;
+            var barMeters = (metersPerPx * 56.0f).toNumber();
             if (barMeters < 10) { barMeters = 10; }
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(2);
-            dc.drawLine(cx - 30, 344, cx + 30, 344);
-            dc.drawLine(cx - 30, 339, cx - 30, 349);
-            dc.drawLine(cx + 30, 339, cx + 30, 349);
-            dc.drawText(cx, 326, Theme.fLabel as Graphics.FontType, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawLine(cx - 28, 344, cx + 28, 344);
+            dc.drawLine(cx - 28, 339, cx - 28, 349);
+            dc.drawLine(cx + 28, 339, cx + 28, 349);
+            dc.drawText(cx, 326, Graphics.FONT_XTINY, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
             drawHeadingArrow(dc, cx, cy, manager.heading);
             dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            var gpsText = (manager.gpsQuality >= Position.QUALITY_POOR) ? "TRACÉ EN COURS..." : "RECHERCHE GPS...";
-            dc.drawText(cx, cy + 48, Theme.fSmall as Graphics.FontType, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            var gpsText = (manager.gpsQuality >= Position.QUALITY_POOR) ? "TRACÉ GPS" : "RECHERCHE GPS";
+            dc.drawText(cx, 340, Graphics.FONT_XTINY, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
-
-        // Top distance readout
-        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 62, Theme.fSmall as Graphics.FontType,
-            SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km",
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function drawHeadingArrow(dc as Dc, x as Number, y as Number, headingRad as Float) as Void {
         var sinH = Math.sin(headingRad);
         var cosH = Math.cos(headingRad);
-        var tipX = x + (sinH * 12.0d).toNumber();
-        var tipY = y - (cosH * 12.0d).toNumber();
-        var leftX = x + (Math.sin(headingRad - 2.4d) * 9.0d).toNumber();
-        var leftY = y - (Math.cos(headingRad - 2.4d) * 9.0d).toNumber();
-        var rightX = x + (Math.sin(headingRad + 2.4d) * 9.0d).toNumber();
-        var rightY = y - (Math.cos(headingRad + 2.4d) * 9.0d).toNumber();
+        var tipX = x + (sinH * 14.0d).toNumber();
+        var tipY = y - (cosH * 14.0d).toNumber();
+        var leftX = x + (Math.sin(headingRad - 2.4d) * 10.0d).toNumber();
+        var leftY = y - (Math.cos(headingRad - 2.4d) * 10.0d).toNumber();
+        var rightX = x + (Math.sin(headingRad + 2.4d) * 10.0d).toNumber();
+        var rightY = y - (Math.cos(headingRad + 2.4d) * 10.0d).toNumber();
         var pts = [[tipX, tipY], [leftX, leftY], [x, y], [rightX, rightY]] as Array<[Numeric, Numeric]>;
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.fillPolygon(pts);
     }
 
-    // PAGE 4: Time of Day, Sunset, Battery Remaining
+    // PAGE 4: Pure Minimalist Native Garmin Clock & Battery on Pure Black
     private function drawPage4ClockBattery(dc as Dc) as Void {
-        var w = dc.getWidth();
-        var cx = w / 2;
+        var cx = dc.getWidth() / 2;
 
         var clock = System.getClockTime();
         var timeStr = clock.hour.format("%02d") + ":" + clock.min.format("%02d");
         var secStr = clock.sec.format("%02d");
 
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 62, Theme.fLabel as Graphics.FontType, "HEURE DU JOUR", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
+        // Huge centered clock on pure black
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 18, 122, Theme.fChronoHuge as Graphics.FontType, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 178, Graphics.FONT_NUMBER_THAI_HOT, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Crisp seconds cleanly below clock (zero overlap!)
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 88, 132, Theme.fMedium as Graphics.FontType, secStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 240, Graphics.FONT_SMALL, secStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(36, 178, w - 36, 178);
-
-        // Approximate Sunset based on month (Northern hemisphere Europe)
-        var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var sunsetTable = ["17:15", "18:05", "18:55", "20:40", "21:25", "21:55", "21:45", "20:55", "19:55", "18:50", "17:10", "16:55"] as Array<String>;
-        var mIdx = (now.month as Number) - 1;
-        if (mIdx < 0 || mIdx > 11) { mIdx = 0; }
-
-        dc.setColor(Theme.COLOR_GPS_YELLOW, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 212, Theme.fLabel as Graphics.FontType, "COUCHER SOLEIL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 246, Theme.fValueMed as Graphics.FontType, sunsetTable[mIdx], Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // Battery Gauge + Estimated GPS hours left (~17h max on FR165)
+        // Clean Battery Gauge + Percentage
         var stats = System.getSystemStats();
         var batt = stats.battery.toNumber();
-        var estHours = ((batt.toFloat() / 100.0f) * 17.0f).toNumber();
-        SportIcons.drawBatteryIcon(dc, cx - 58, 296, 32, 16, batt);
+        var battStr = batt.toString() + "%";
+        var textW = dc.getTextWidthInPixels(battStr, Graphics.FONT_SMALL);
+        var totalW = 36 + 10 + textW;
+        var startX = cx - (totalW / 2);
+
+        SportIcons.drawBatteryIcon(dc, startX, 294, 34, 18, batt);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 16, 304, Theme.fMedium as Graphics.FontType, batt.toString() + "%", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 338, Theme.fLabel as Graphics.FontType, "~" + estHours.toString() + "h GPS restantes", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(startX + 44, 303, Graphics.FONT_SMALL, battStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
 
@@ -439,14 +490,14 @@ class ActiveDataDelegate extends WatchUi.BehaviorDelegate {
     function onKey(evt as WatchUi.KeyEvent) as Boolean {
         if (evt.getKey() == WatchUi.KEY_LIGHT) {
             manager.isLocked = !manager.isLocked;
-            manager.showAlert(manager.isLocked ? "ÉCRAN VERROUILLÉ" : "DÉVERROUILLÉ", "", 2);
+            manager.showAlert(manager.isLocked ? "VERROUILLÉ" : "DÉVERROUILLÉ", "", 2);
             WatchUi.requestUpdate();
             return true;
         }
         return false;
     }
 
-    // Touch swipe: vertical = change data page, right = next segment (when unlocked)
+    // Touch swipe: vertical = change data page
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         if (manager.isLocked) {
             return true;

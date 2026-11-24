@@ -72,7 +72,7 @@ module SportDefinitions {
                 return 0x00AAFF; // Cyan natation FR965
             case SPORT_TRANSITION_1:
             case SPORT_TRANSITION_2:
-                return 0xBBBBBB; // Gris argent transition
+                return 0xFFCC00; // Jaune Garmin transition
             case SPORT_BIKE:
                 return 0x00DD55; // Vert vif vélo
             case SPORT_RUN:
@@ -88,6 +88,21 @@ module SportDefinitions {
         }
     }
 
+    function getFitSafeTag(sport as Number) as String {
+        switch (sport) {
+            case SPORT_SWIM_OPEN: return "SWIM";
+            case SPORT_SWIM_POOL: return "POOL";
+            case SPORT_TRANSITION_1: return "T1";
+            case SPORT_BIKE: return "BIKE";
+            case SPORT_TRANSITION_2: return "T2";
+            case SPORT_RUN: return "RUN";
+            case SPORT_TRAIL: return "TRAIL";
+            case SPORT_WALK: return "WALK";
+            case SPORT_CARDIO: return "CARDIO";
+            default: return "SPORT";
+        }
+    }
+
     function getFitSport(sport as Number) as Activity.Sport {
         switch (sport) {
             case SPORT_SWIM_OPEN:
@@ -95,8 +110,6 @@ module SportDefinitions {
                 return Activity.SPORT_SWIMMING;
             case SPORT_TRANSITION_1:
             case SPORT_TRANSITION_2:
-                // fr165m rejects SPORT_TRANSITION in ActivityRecording.createSession;
-                // record as SPORT_GENERIC tagged [MS:... T1/T2] for the FIT merger.
                 return Activity.SPORT_GENERIC;
             case SPORT_BIKE:
                 return Activity.SPORT_CYCLING;
@@ -118,20 +131,12 @@ module SportDefinitions {
                 return Activity.SUB_SPORT_OPEN_WATER;
             case SPORT_SWIM_POOL:
                 return Activity.SUB_SPORT_LAP_SWIMMING;
-            case SPORT_TRANSITION_1:
-            case SPORT_TRANSITION_2:
-                return Activity.SUB_SPORT_GENERIC;
-            case SPORT_BIKE:
-                return Activity.SUB_SPORT_ROAD;
-            case SPORT_RUN:
-                return Activity.SUB_SPORT_GENERIC;
             case SPORT_TRAIL:
                 return Activity.SUB_SPORT_TRAIL;
-            case SPORT_WALK:
-                return Activity.SUB_SPORT_GENERIC;
             case SPORT_CARDIO:
                 return Activity.SUB_SPORT_CARDIO_TRAINING;
             default:
+                // SUB_SPORT_GENERIC is 100% supported across Cycling, Running, Walking, Transition on fr165m
                 return Activity.SUB_SPORT_GENERIC;
         }
     }
@@ -264,15 +269,22 @@ module SportDefinitions {
 
     function formatDistance(meters as Float, isSwimSport as Boolean) as String {
         if (meters <= 0.0f) {
-            return isSwimSport ? "0 m" : "0.00";
+            return isSwimSport ? "0" : "0.00";
         }
         if (isSwimSport && meters < 1000.0f) {
-            return meters.toNumber().toString() + " m";
+            return meters.toNumber().toString();
         }
         var km = meters / 1000.0f;
         if (km >= 100.0f) {
             return km.format("%.1f");
         }
         return km.format("%.2f");
+    }
+
+    function getDistanceUnit(meters as Float, isSwimSport as Boolean) as String {
+        if (isSwimSport && meters < 1000.0f) {
+            return "m";
+        }
+        return "km";
     }
 }

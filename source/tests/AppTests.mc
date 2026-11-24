@@ -42,11 +42,14 @@ module AppTests {
         Test.assertEqual(mgr.overlayType, MultisportManager.OVERLAY_LAP);
 
         // 6. Advance through all segments (Swim -> T1 -> Bike -> T2 -> Run -> Summary)
+        // Run 3 ticks per leg so pendingSessionDelay=2 ACTUALLY triggers createSession for EVERY leg!
         var finished = false;
         var guard = 0;
         while (!finished && guard < 10) {
             finished = mgr.nextSegment();
-            mgr.onTick();
+            for (var t = 0; t < 3; t++) {
+                mgr.onTick();
+            }
             guard++;
         }
         Test.assert(finished);

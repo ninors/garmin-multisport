@@ -1,126 +1,53 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.WatchUi;
 
 module SportIcons {
 
-    // Draw crisp vector sport icon centered at (cx, cy) with radius r
+    var bmpSwim as WatchUi.BitmapResource?;
+    var bmpBike as WatchUi.BitmapResource?;
+    var bmpRun as WatchUi.BitmapResource?;
+    var bmpTrans as WatchUi.BitmapResource?;
+    var bmpWalk as WatchUi.BitmapResource?;
+    var bmpCardio as WatchUi.BitmapResource?;
+    var iconsLoaded as Boolean = false;
+
+    function ensureIcons() as Void {
+        if (iconsLoaded) {
+            return;
+        }
+        iconsLoaded = true;
+        bmpSwim = WatchUi.loadResource(Rez.Drawables.IcSwim) as WatchUi.BitmapResource;
+        bmpBike = WatchUi.loadResource(Rez.Drawables.IcBike) as WatchUi.BitmapResource;
+        bmpRun = WatchUi.loadResource(Rez.Drawables.IcRun) as WatchUi.BitmapResource;
+        bmpTrans = WatchUi.loadResource(Rez.Drawables.IcTrans) as WatchUi.BitmapResource;
+        bmpWalk = WatchUi.loadResource(Rez.Drawables.IcWalk) as WatchUi.BitmapResource;
+        bmpCardio = WatchUi.loadResource(Rez.Drawables.IcCardio) as WatchUi.BitmapResource;
+    }
+
+    // Draw crisp Google Material Symbols SVG icon centered at (cx, cy)
     function drawSportIcon(dc as Dc, sport as Number, cx as Number, cy as Number, r as Number, color as Number) as Void {
-        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-
+        ensureIcons();
+        var bmp = null as WatchUi.BitmapResource?;
         if (sport == SportDefinitions.SPORT_SWIM_OPEN || sport == SportDefinitions.SPORT_SWIM_POOL) {
-            drawSwimIcon(dc, cx, cy, r);
+            bmp = bmpSwim;
         } else if (sport == SportDefinitions.SPORT_TRANSITION_1 || sport == SportDefinitions.SPORT_TRANSITION_2) {
-            drawTransitionIcon(dc, cx, cy, r, (sport == SportDefinitions.SPORT_TRANSITION_1) ? "T1" : "T2");
+            bmp = bmpTrans;
         } else if (sport == SportDefinitions.SPORT_BIKE) {
-            drawBikeIcon(dc, cx, cy, r);
+            bmp = bmpBike;
         } else if (sport == SportDefinitions.SPORT_RUN || sport == SportDefinitions.SPORT_TRAIL) {
-            drawRunIcon(dc, cx, cy, r);
+            bmp = bmpRun;
         } else if (sport == SportDefinitions.SPORT_WALK) {
-            drawWalkIcon(dc, cx, cy, r);
+            bmp = bmpWalk;
         } else {
-            drawCardioIcon(dc, cx, cy, r);
+            bmp = bmpCardio;
         }
-    }
 
-    function drawSwimIcon(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
-        var s = r.toFloat() / 16.0f;
-        // Head
-        dc.fillCircle(cx + (6.0f * s).toNumber(), cy - (4.0f * s).toNumber(), (3.0f * s).toNumber());
-        // Arm & torso stroke
-        dc.setPenWidth(3);
-        dc.drawLine(
-            cx - (8.0f * s).toNumber(), cy + (1.0f * s).toNumber(),
-            cx + (1.0f * s).toNumber(), cy - (6.0f * s).toNumber()
-        );
-        dc.drawLine(
-            cx + (1.0f * s).toNumber(), cy - (6.0f * s).toNumber(),
-            cx + (4.0f * s).toNumber(), cy + (1.0f * s).toNumber()
-        );
-        // Water wave
-        dc.setPenWidth(2);
-        var wy = cy + (6.0f * s).toNumber();
-        dc.drawLine(cx - (11.0f * s).toNumber(), wy, cx - (5.0f * s).toNumber(), wy - (2.0f * s).toNumber());
-        dc.drawLine(cx - (5.0f * s).toNumber(), wy - (2.0f * s).toNumber(), cx, wy + (1.0f * s).toNumber());
-        dc.drawLine(cx, wy + (1.0f * s).toNumber(), cx + (5.0f * s).toNumber(), wy - (2.0f * s).toNumber());
-        dc.drawLine(cx + (5.0f * s).toNumber(), wy - (2.0f * s).toNumber(), cx + (11.0f * s).toNumber(), wy);
-    }
-
-    function drawTransitionIcon(dc as Dc, cx as Number, cy as Number, r as Number, label as String) as Void {
-        var s = r.toFloat() / 16.0f;
-        // Double transfer arrows above/below or crisp T1/T2 badge
-        Theme.ensureFonts();
-        if (r >= 14) {
-            dc.drawText(cx, cy, Theme.fLabel as Graphics.FontType, label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else {
-            // Compact right arrow chevron
-            dc.setPenWidth(2);
-            var w = (6.0f * s).toNumber();
-            dc.drawLine(cx - w, cy - (3.0f * s).toNumber(), cx + w, cy - (3.0f * s).toNumber());
-            dc.drawLine(cx + w - 3, cy - (6.0f * s).toNumber(), cx + w, cy - (3.0f * s).toNumber());
-            dc.drawLine(cx + w, cy + (3.0f * s).toNumber(), cx - w, cy + (3.0f * s).toNumber());
-            dc.drawLine(cx - w + 3, cy + (6.0f * s).toNumber(), cx - w, cy + (3.0f * s).toNumber());
+        if (bmp != null) {
+            var bw = bmp.getWidth();
+            var bh = bmp.getHeight();
+            dc.drawBitmap(cx - (bw / 2), cy - (bh / 2), bmp);
         }
-    }
-
-    function drawBikeIcon(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
-        var s = r.toFloat() / 16.0f;
-        var wr = (4.5f * s).toNumber();
-        if (wr < 3) { wr = 3; }
-        var wy = cy + (4.0f * s).toNumber();
-        var lx = cx - (7.0f * s).toNumber();
-        var rx = cx + (7.0f * s).toNumber();
-        // Wheels
-        dc.setPenWidth(2);
-        dc.drawCircle(lx, wy, wr);
-        dc.drawCircle(rx, wy, wr);
-        // Frame triangle
-        var seatX = cx - (2.0f * s).toNumber();
-        var seatY = cy - (3.0f * s).toNumber();
-        var barX = cx + (4.0f * s).toNumber();
-        var barY = cy - (4.0f * s).toNumber();
-        dc.drawLine(lx, wy, seatX, seatY);
-        dc.drawLine(seatX, seatY, barX, barY);
-        dc.drawLine(barX, barY, rx, wy);
-        dc.drawLine(seatX, seatY, cx, wy);
-        // Rider head
-        dc.fillCircle(cx + (2.0f * s).toNumber(), cy - (9.0f * s).toNumber(), (2.5f * s).toNumber());
-    }
-
-    function drawRunIcon(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
-        var s = r.toFloat() / 16.0f;
-        // Head
-        dc.fillCircle(cx + (3.0f * s).toNumber(), cy - (9.0f * s).toNumber(), (3.0f * s).toNumber());
-        dc.setPenWidth(3);
-        // Torso
-        dc.drawLine(cx + (1.0f * s).toNumber(), cy - (5.0f * s).toNumber(), cx - (2.0f * s).toNumber(), cy + (2.0f * s).toNumber());
-        // Arms
-        dc.setPenWidth(2);
-        dc.drawLine(cx + (1.0f * s).toNumber(), cy - (4.0f * s).toNumber(), cx + (7.0f * s).toNumber(), cy - (2.0f * s).toNumber());
-        dc.drawLine(cx, cy - (3.0f * s).toNumber(), cx - (6.0f * s).toNumber(), cy - (1.0f * s).toNumber());
-        // Legs
-        dc.drawLine(cx - (2.0f * s).toNumber(), cy + (2.0f * s).toNumber(), cx + (5.0f * s).toNumber(), cy + (6.0f * s).toNumber());
-        dc.drawLine(cx + (5.0f * s).toNumber(), cy + (6.0f * s).toNumber(), cx + (3.0f * s).toNumber(), cy + (11.0f * s).toNumber());
-        dc.drawLine(cx - (2.0f * s).toNumber(), cy + (2.0f * s).toNumber(), cx - (7.0f * s).toNumber(), cy + (8.0f * s).toNumber());
-    }
-
-    function drawWalkIcon(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
-        var s = r.toFloat() / 16.0f;
-        dc.fillCircle(cx, cy - (9.0f * s).toNumber(), (3.0f * s).toNumber());
-        dc.setPenWidth(2);
-        dc.drawLine(cx, cy - (5.0f * s).toNumber(), cx, cy + (3.0f * s).toNumber());
-        dc.drawLine(cx, cy + (3.0f * s).toNumber(), cx - (5.0f * s).toNumber(), cy + (10.0f * s).toNumber());
-        dc.drawLine(cx, cy + (3.0f * s).toNumber(), cx + (5.0f * s).toNumber(), cy + (10.0f * s).toNumber());
-    }
-
-    function drawCardioIcon(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
-        var s = r.toFloat() / 16.0f;
-        dc.setPenWidth(2);
-        dc.drawLine(cx - (10.0f * s).toNumber(), cy, cx - (4.0f * s).toNumber(), cy);
-        dc.drawLine(cx - (4.0f * s).toNumber(), cy, cx - (1.0f * s).toNumber(), cy - (8.0f * s).toNumber());
-        dc.drawLine(cx - (1.0f * s).toNumber(), cy - (8.0f * s).toNumber(), cx + (2.0f * s).toNumber(), cy + (8.0f * s).toNumber());
-        dc.drawLine(cx + (2.0f * s).toNumber(), cy + (8.0f * s).toNumber(), cx + (5.0f * s).toNumber(), cy);
-        dc.drawLine(cx + (5.0f * s).toNumber(), cy, cx + (10.0f * s).toNumber(), cy);
     }
 
     // Crisp vector Heart icon
@@ -142,11 +69,9 @@ module SportIcons {
     function drawGpsIcon(dc as Dc, cx as Number, cy as Number, color as Number) as Void {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        // Satellite body (tilted)
         dc.fillCircle(cx, cy, 4);
         dc.drawLine(cx - 8, cy - 4, cx - 3, cy - 1);
         dc.drawLine(cx + 3, cy + 1, cx + 8, cy + 4);
-        // Signal arcs
         dc.drawArc(cx - 2, cy + 2, 7, Graphics.ARC_CLOCKWISE, 260, 190);
         dc.drawArc(cx - 2, cy + 2, 11, Graphics.ARC_CLOCKWISE, 260, 190);
     }

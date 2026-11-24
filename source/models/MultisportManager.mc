@@ -413,10 +413,10 @@ class MultisportManager {
         lastAutoLapDistMeters = 0.0f;
         lastSessionDist = 0.0f;
 
-        // Compact ASCII tag [MS:YYMMDD_HHMM 1-5] Sport (safe length for FIT header)
+        // Compact pure-ASCII tag MS YYMMDD_HHMM 1-5 SWIM (safe length & chars for fr165m FIT)
         var sessionName = "MS " + msGroupId + " " +
             (currentLegIndex + 1).toString() + "-" + legs.size().toString() + " " +
-            SportDefinitions.getSportShortName(sport);
+            SportDefinitions.getFitSafeTag(sport);
 
         var opts = {
             :name => sessionName,
