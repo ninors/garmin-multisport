@@ -43,42 +43,81 @@ module GarminComponents {
         dc.drawText(startX + 22, 44, Theme.fMedium as Graphics.FontType, hrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Bottom 5-zone HR arc (Active Main screen — signature FR965)
-    // Spans 218 deg (bottom-left) counter-clockwise to 322 deg (bottom-right) = 104 deg total
+    // Signature FR965 Faded Horizontal Divider Line (thick bright center, fades smoothly to edges)
+    function drawFadedHorizontalLine(dc as Dc, y as Number, x1 as Number, x2 as Number, brightColor as Number, midColor as Number, dimColor as Number) as Void {
+        var span = x2 - x1;
+        var e1 = x1 + (span / 8);
+        var e2 = x1 + (span / 4);
+        var e3 = x2 - (span / 4);
+        var e4 = x2 - (span / 8);
+
+        dc.setPenWidth(3);
+        dc.setColor(dimColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(x1, y, e1, y);
+        dc.drawLine(e4, y, x2, y);
+
+        dc.setColor(midColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(e1, y, e2, y);
+        dc.drawLine(e3, y, e4, y);
+
+        dc.setColor(brightColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(e2, y, e3, y);
+    }
+
+    // Bottom 5-zone HR arc — EXACT Forerunner 965 style (thin inactive zones, THICK active zone + white vertical tick!)
     function drawBottomHrArc(dc as Dc, hr as Number, zonePos as Float, zoneIdx as Number) as Void {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        var radius = (cx - 10);
-        var startDeg = 218.0f;
-        var totalSpan = 104.0f;
+        var radius = (cx - 14);
+        var startDeg = 216.0f;
+        var totalSpan = 108.0f;
         var segSpan = totalSpan / 5.0f;
-        var gap = 2.0f;
+        var gap = 2.2f;
+        var hasHr = (hr > 30);
 
-        dc.setPenWidth(10);
         for (var i = 0; i < 5; i++) {
             var a1 = (startDeg + (i * segSpan)).toNumber();
             var a2 = (startDeg + ((i + 1) * segSpan) - gap).toNumber();
             dc.setColor(Theme.ZONE_COLORS[i], Graphics.COLOR_TRANSPARENT);
-            dc.drawArc(cx, cy, radius, Graphics.ARC_COUNTER_CLOCKWISE, a1, a2);
+            if (hasHr && i == zoneIdx) {
+                // Active zone pops out THICK exactly like Forerunner 965!
+                dc.setPenWidth(18);
+                dc.drawArc(cx, cy, radius - 2, Graphics.ARC_COUNTER_CLOCKWISE, a1, a2);
+            } else {
+                dc.setPenWidth(6);
+                dc.drawArc(cx, cy, radius, Graphics.ARC_COUNTER_CLOCKWISE, a1, a2);
+            }
         }
 
-        // White movable pointer on bottom arc
-        if (hr > 30) {
+        // Crisp vertical white tick marker through the active thick zone
+        if (hasHr) {
             var cursorAngleDeg = startDeg + ((zonePos / 5.0f) * totalSpan);
-            drawArcCursor(dc, cx, cy, radius, cursorAngleDeg, false);
+            var rad = cursorAngleDeg * Math.PI / 180.0d;
+            var cosA = Math.cos(rad);
+            var sinA = Math.sin(rad);
+            var xIn = cx + (cosA * (radius - 13)).toNumber();
+            var yIn = cy - (sinA * (radius - 13)).toNumber();
+            var xOut = cx + (cosA * (radius + 9)).toNumber();
+            var yOut = cy - (sinA * (radius + 9)).toNumber();
+            dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(7);
+            dc.drawLine(xIn, yIn, xOut, yOut);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(4);
+            dc.drawLine(xIn, yIn, xOut, yOut);
         }
 
-        // Colored heart (zone color) + large BPM value
+        // Colored heart (zone color) + large crisp BPM value
         Theme.ensureFonts();
-        var hrText = (hr > 30) ? hr.toString() : "--";
-        var heartColor = (hr > 30) ? Theme.getZoneColor(zoneIdx) : Theme.COLOR_HEART_RED;
+        var hrText = hasHr ? hr.toString() : "--";
+        var heartColor = hasHr ? Theme.getZoneColor(zoneIdx) : Theme.COLOR_HEART_RED;
         var textW = dc.getTextWidthInPixels(hrText, Theme.fValueBig as Graphics.FontType);
-        var totalW = 30 + textW;
+        var totalW = 32 + textW;
         var startX = cx - (totalW / 2);
 
-        SportIcons.drawHeart(dc, startX + 11, 314, 20, heartColor);
+        SportIcons.drawHeart(dc, startX + 11, 308, 20, heartColor);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(startX + 28, 314, Theme.fValueBig as Graphics.FontType, hrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(startX + 30, 308, Theme.fValueBig as Graphics.FontType, hrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // Crisp white pointer triangle on an arc

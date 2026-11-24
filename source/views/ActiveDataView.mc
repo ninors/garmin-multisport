@@ -8,7 +8,7 @@ import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
 
 class ActiveDataView extends WatchUi.View {
-    public static const TOTAL_PAGES = 5;
+    public static const TOTAL_PAGES = 6;
     private var manager as MultisportManager;
     public var currentPage as Number;
 
@@ -45,8 +45,10 @@ class ActiveDataView extends WatchUi.View {
             drawPage2MultisportRecap(dc);
         } else if (currentPage == 3) {
             drawPage3GpsTrack(dc);
+        } else if (currentPage == 4) {
+            drawPage4ElevationProfile(dc);
         } else {
-            drawPage4ClockBattery(dc);
+            drawPage5ClockBattery(dc);
         }
 
         // Right-edge pagination dots
@@ -83,11 +85,11 @@ class ActiveDataView extends WatchUi.View {
         // Large crisp transition chrono
         GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 88, Theme.COLOR_WHITE);
 
-        // Signature Garmin Yellow Dividers for Transitions
+        // Signature Garmin Faded Yellow Dividers for Transitions
+        GarminComponents.drawFadedHorizontalLine(dc, 132, 16, w - 16, 0xFFCC00, 0x886600, 0x332200);
+        GarminComponents.drawFadedHorizontalLine(dc, 256, 16, w - 16, 0xFFCC00, 0x886600, 0x332200);
         dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(16, 132, w - 16, 132);
-        dc.drawLine(16, 256, w - 16, 256);
+        dc.setPenWidth(3);
         dc.drawLine(cx, 132, cx, 256);
 
         var leftCx = cx / 2 + 6;
@@ -151,11 +153,11 @@ class ActiveDataView extends WatchUi.View {
             dc.drawText(cx, 84, Graphics.FONT_NUMBER_MEDIUM, manager.getFormattedFieldValue(topField), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // Signature FR965 Thin Red Dividers (#FF0033)
+        // Signature FR965 Faded Red Dividers (thick bright center fading to edges — exact Photo 4!)
+        GarminComponents.drawFadedHorizontalLine(dc, 130, 14, w - 14, 0xFF0033, 0x88001A, 0x2A0008);
+        GarminComponents.drawFadedHorizontalLine(dc, 256, 14, w - 14, 0xFF0033, 0x88001A, 0x2A0008);
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(14, 130, w - 14, 130);
-        dc.drawLine(14, 256, w - 14, 256);
+        dc.setPenWidth(3);
         dc.drawLine(cx, 130, cx, 256);
 
         // Middle 2 Columns: Dynamic unit in label so big numbers NEVER overflow!
@@ -388,33 +390,19 @@ class ActiveDataView extends WatchUi.View {
             }
             drawHeadingArrow(dc, prevX, prevY, manager.heading);
 
-            // Dynamic scale bar
+            // Dynamic scale bar (clean, NO legend)
             var metersPerPx = (maxSpan * 111000.0f) / 196.0f;
             var barMeters = (metersPerPx * 52.0f).toNumber();
             if (barMeters < 10) { barMeters = 10; }
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(2);
-            dc.drawLine(cx - 26, 326, cx + 26, 326);
-            dc.drawText(cx, 312, Graphics.FONT_XTINY, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawLine(cx - 26, 344, cx + 26, 344);
+            dc.drawLine(cx - 26, 339, cx - 26, 349);
+            dc.drawLine(cx + 26, 339, cx + 26, 349);
+            dc.drawText(cx, 326, Graphics.FONT_XTINY, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
             drawHeadingArrow(dc, cx, cy, manager.heading);
         }
-
-        // Compact color legend at bottom: Blue Swim • Green Bike • Red Run
-        dc.setColor(0x00AAFF, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(cx - 72, 354, 4);
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 64, 354, Graphics.FONT_XTINY, "Nage", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        dc.setColor(0x00DD55, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(cx - 12, 354, 4);
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 4, 354, Graphics.FONT_XTINY, "Vélo", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        dc.setColor(0xFF2233, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(cx + 42, 354, 4);
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 50, 354, Graphics.FONT_XTINY, "Run", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function getTrackColorForSport(sport as Number) as Number {
@@ -442,8 +430,77 @@ class ActiveDataView extends WatchUi.View {
         dc.fillPolygon(pts);
     }
 
-    // PAGE 4: Pure Minimalist Native Garmin Clock & Battery on Pure Black
-    private function drawPage4ClockBattery(dc as Dc) as Void {
+    // PAGE 4: Native Garmin Elevation & Elevation Profile Area Chart
+    private function drawPage4ElevationProfile(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var cx = w / 2;
+
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 44, Graphics.FONT_XTINY, "ALTITUDE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        var altNum = manager.altitude.toNumber();
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 88, Graphics.FONT_NUMBER_MILD, altNum.toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx - 56, 130, Graphics.FONT_XTINY, "D+ " + manager.totalAscent.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_GPS_RED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx + 56, 130, Graphics.FONT_XTINY, "D- " + manager.totalDescent.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        GarminComponents.drawFadedHorizontalLine(dc, 152, 24, w - 24, 0x00CC44, 0x006622, 0x00220A);
+
+        var gx = 52;
+        var gw = w - 104;
+        var gyTop = 180;
+        var gyBot = 316;
+        var gh = gyBot - gyTop;
+
+        var count = manager.altHistory.size();
+        if (count >= 2) {
+            var minA = manager.altHistory[0];
+            var maxA = minA;
+            for (var i = 1; i < count; i++) {
+                var a = manager.altHistory[i];
+                if (a < minA) { minA = a; }
+                if (a > maxA) { maxA = a; }
+            }
+            var span = maxA - minA;
+            if (span < 10.0f) { span = 10.0f; }
+
+            var prevX = gx;
+            var prevY = gyBot - (((manager.altHistory[0] - minA) / span) * gh.toFloat()).toNumber();
+            for (var j = 1; j < count; j++) {
+                var px = gx + ((j.toFloat() / (count - 1).toFloat()) * gw.toFloat()).toNumber();
+                var py = gyBot - (((manager.altHistory[j] - minA) / span) * gh.toFloat()).toNumber();
+                var quad = [
+                    [prevX, prevY],
+                    [px, py],
+                    [px, gyBot],
+                    [prevX, gyBot]
+                ] as Array<[Numeric, Numeric]>;
+                dc.setColor(0x003D18, Graphics.COLOR_TRANSPARENT);
+                dc.fillPolygon(quad);
+                dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+                dc.setPenWidth(3);
+                dc.drawLine(prevX, prevY, px, py);
+                prevX = px;
+                prevY = py;
+            }
+
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(gx, 168, Graphics.FONT_XTINY, maxA.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(gx + gw, 336, Graphics.FONT_XTINY, minA.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(2);
+            dc.drawLine(gx, gyBot - 30, gx + gw, gyBot - 30);
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, 250, Graphics.FONT_XTINY, "PROFIL ALTITUDE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+    }
+
+    // PAGE 5: Pure Minimalist Native Garmin Clock & Battery on Pure Black
+    private function drawPage5ClockBattery(dc as Dc) as Void {
         var cx = dc.getWidth() / 2;
 
         var clock = System.getClockTime();

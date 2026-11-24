@@ -88,6 +88,14 @@ class MultisportManager {
     private var lastTrackLon as Double;
     private var hasLastTrack as Boolean;
 
+    // Elevation profile ring buffer (max 80 points, low RAM & low battery) + D+/D-
+    public static const MAX_ALT_POINTS = 80;
+    public var altHistory as Array<Float>;
+    public var totalAscent as Float;
+    public var totalDescent as Float;
+    private var lastAltSample as Float;
+    private var hasLastAlt as Boolean;
+
     // Active FIT recording session
     private var session as ActivityRecording.Session?;
     private var pendingSessionDelay as Number;
@@ -147,6 +155,12 @@ class MultisportManager {
         lastTrackLat = 0.0d;
         lastTrackLon = 0.0d;
         hasLastTrack = false;
+
+        altHistory = [] as Array<Float>;
+        totalAscent = 0.0f;
+        totalDescent = 0.0f;
+        lastAltSample = 0.0f;
+        hasLastAlt = false;
 
         session = null;
         pendingSessionDelay = 0;
@@ -291,6 +305,10 @@ class MultisportManager {
         trackLons = [] as Array<Float>;
         trackSports = [] as Array<Number>;
         hasLastTrack = false;
+        altHistory = [] as Array<Float>;
+        totalAscent = 0.0f;
+        totalDescent = 0.0f;
+        hasLastAlt = false;
         lastNutritionAlertSec = 0;
         lastDistAlertMeters = 0.0f;
         lastTimeAlertSec = 0;
@@ -628,6 +646,28 @@ class MultisportManager {
             }
             var z = getHrZoneIndex(heartRate); // 0..4
             zoneSeconds[z] = zoneSeconds[z] + 1;
+        }
+
+        // Low-power elevation profile sampling (every 5 seconds)
+        if ((tickCount % 5) == 0 && altitude > -500.0f && altitude < 9000.0f) {
+            if (hasLastAlt) {
+                var dAlt = altitude - lastAltSample;
+                if (dAlt > 1.5f) {
+                    totalAscent += dAlt;
+                } else if (dAlt < -1.5f) {
+                    totalDescent += (-dAlt);
+                }
+            }
+            lastAltSample = altitude;
+            hasLastAlt = true;
+            if (altHistory.size() >= MAX_ALT_POINTS) {
+                var compacted = [] as Array<Float>;
+                for (var k = 0; k < altHistory.size(); k += 2) {
+                    compacted.add(altHistory[k]);
+                }
+                altHistory = compacted;
+            }
+            altHistory.add(altitude);
         }
     }
 

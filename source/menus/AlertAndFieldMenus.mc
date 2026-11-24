@@ -28,47 +28,58 @@ module AlertAndFieldMenus {
 
 class AlertsMenuDelegate extends WatchUi.Menu2InputDelegate {
     private var manager as MultisportManager;
+    private var activeItem as WatchUi.MenuItem?;
+    private var activeId as Symbol?;
 
     function initialize(mgr as MultisportManager) {
         Menu2InputDelegate.initialize();
         manager = mgr;
+        activeItem = null;
+        activeId = null;
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
         var s = manager.settings;
+        activeItem = item;
+        activeId = id as Symbol;
 
+        var picker = null as GarminPickerView?;
         if (id == :hr_max) {
-            if (s.hrAlertMax == 0) { s.hrAlertMax = 160; }
-            else if (s.hrAlertMax == 160) { s.hrAlertMax = 175; }
-            else if (s.hrAlertMax == 175) { s.hrAlertMax = 185; }
-            else { s.hrAlertMax = 0; }
-            item.setSubLabel((s.hrAlertMax > 0) ? (s.hrAlertMax.toString() + " bpm") : "Désactivée");
+            picker = new GarminPickerView("ALERTE FC MAX", "bpm (0 = OFF)", GarminPickerView.MODE_NUMBER, s.hrAlertMax, 110, 210, 1);
         } else if (id == :pace_slow) {
-            if (s.paceAlertSlowSec == 0) { s.paceAlertSlowSec = 300; }
-            else if (s.paceAlertSlowSec == 300) { s.paceAlertSlowSec = 330; }
-            else if (s.paceAlertSlowSec == 330) { s.paceAlertSlowSec = 360; }
-            else { s.paceAlertSlowSec = 0; }
-            item.setSubLabel((s.paceAlertSlowSec > 0) ? (SportDefinitions.formatPaceSecPerUnit(s.paceAlertSlowSec.toFloat()) + " /km") : "Désactivée");
+            var initP = (s.paceAlertSlowSec > 0) ? s.paceAlertSlowSec : 300;
+            picker = new GarminPickerView("ALLURE LENTE", "min:sec / km (0:00 = OFF)", GarminPickerView.MODE_TIME_MMSS, initP, 0, 3599, 1);
         } else if (id == :dist_alert) {
-            if (s.distAlertMeters == 0) { s.distAlertMeters = 1000; }
-            else if (s.distAlertMeters == 1000) { s.distAlertMeters = 5000; }
-            else if (s.distAlertMeters == 5000) { s.distAlertMeters = 10000; }
-            else { s.distAlertMeters = 0; }
-            item.setSubLabel((s.distAlertMeters > 0) ? ((s.distAlertMeters / 1000).toString() + " km") : "Désactivée");
+            picker = new GarminPickerView("ALERTE DISTANCE", "mètres (0 = OFF)", GarminPickerView.MODE_NUMBER, s.distAlertMeters, 500, 42000, 500);
         } else if (id == :time_alert) {
-            if (s.timeAlertMin == 0) { s.timeAlertMin = 15; }
-            else if (s.timeAlertMin == 15) { s.timeAlertMin = 30; }
-            else if (s.timeAlertMin == 30) { s.timeAlertMin = 60; }
-            else { s.timeAlertMin = 0; }
-            item.setSubLabel((s.timeAlertMin > 0) ? (s.timeAlertMin.toString() + " min") : "Désactivée");
+            picker = new GarminPickerView("ALERTE TEMPS", "minutes (0 = OFF)", GarminPickerView.MODE_NUMBER, s.timeAlertMin, 1, 180, 1);
         } else if (id == :nutrition) {
-            if (s.nutritionAlertMin == 0) { s.nutritionAlertMin = 15; }
-            else if (s.nutritionAlertMin == 15) { s.nutritionAlertMin = 20; }
-            else if (s.nutritionAlertMin == 20) { s.nutritionAlertMin = 30; }
-            else if (s.nutritionAlertMin == 30) { s.nutritionAlertMin = 45; }
-            else { s.nutritionAlertMin = 0; }
-            item.setSubLabel((s.nutritionAlertMin > 0) ? ("Toutes les " + s.nutritionAlertMin.toString() + " min") : "Désactivée");
+            picker = new GarminPickerView("HYDRATATION", "toutes les X min", GarminPickerView.MODE_NUMBER, s.nutritionAlertMin, 5, 90, 1);
+        }
+
+        if (picker != null) {
+            WatchUi.pushView(picker, new GarminPickerDelegate(picker, method(:onPicked)), WatchUi.SLIDE_LEFT);
+        }
+    }
+
+    public function onPicked(val as Number) as Void {
+        var s = manager.settings;
+        if (activeId == :hr_max) {
+            s.hrAlertMax = val;
+            if (activeItem != null) { (activeItem as WatchUi.MenuItem).setSubLabel((val > 0) ? (val.toString() + " bpm") : "Désactivée"); }
+        } else if (activeId == :pace_slow) {
+            s.paceAlertSlowSec = val;
+            if (activeItem != null) { (activeItem as WatchUi.MenuItem).setSubLabel((val > 0) ? (SportDefinitions.formatPaceSecPerUnit(val.toFloat()) + " /km") : "Désactivée"); }
+        } else if (activeId == :dist_alert) {
+            s.distAlertMeters = val;
+            if (activeItem != null) { (activeItem as WatchUi.MenuItem).setSubLabel((val > 0) ? ((val / 1000.0f).format("%.1f") + " km") : "Désactivée"); }
+        } else if (activeId == :time_alert) {
+            s.timeAlertMin = val;
+            if (activeItem != null) { (activeItem as WatchUi.MenuItem).setSubLabel((val > 0) ? (val.toString() + " min") : "Désactivée"); }
+        } else if (activeId == :nutrition) {
+            s.nutritionAlertMin = val;
+            if (activeItem != null) { (activeItem as WatchUi.MenuItem).setSubLabel((val > 0) ? ("Toutes les " + val.toString() + " min") : "Désactivée"); }
         }
         s.save();
     }

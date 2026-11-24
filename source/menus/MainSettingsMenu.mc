@@ -27,10 +27,12 @@ module MainSettingsMenu {
 
 class MainSettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
     private var manager as MultisportManager;
+    private var autoLapItem as WatchUi.MenuItem?;
 
     function initialize(mgr as MultisportManager) {
         Menu2InputDelegate.initialize();
         manager = mgr;
+        autoLapItem = null;
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
@@ -68,17 +70,9 @@ class MainSettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id == :alerts) {
             AlertAndFieldMenus.pushAlertsMenu(manager);
         } else if (id == :auto_lap) {
-            if (s.autoLapDistanceMeters == 0) {
-                s.autoLapDistanceMeters = 500;
-            } else if (s.autoLapDistanceMeters == 500) {
-                s.autoLapDistanceMeters = 1000;
-            } else if (s.autoLapDistanceMeters == 1000) {
-                s.autoLapDistanceMeters = 5000;
-            } else {
-                s.autoLapDistanceMeters = 0;
-            }
-            s.save();
-            item.setSubLabel(s.getAutoLapLabel());
+            autoLapItem = item;
+            var picker = new GarminPickerView("TOURS AUTO", "mètres (0 = OFF)", GarminPickerView.MODE_NUMBER, s.autoLapDistanceMeters, 100, 10000, 100);
+            WatchUi.pushView(picker, new GarminPickerDelegate(picker, method(:onAutoLapPicked)), WatchUi.SLIDE_LEFT);
         } else if (id == :gps_mode) {
             s.gpsMode = (s.gpsMode + 1) % 3;
             s.save();
@@ -95,6 +89,14 @@ class MainSettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
                 s.vibesEnabled = en;
                 s.save();
             }
+        }
+    }
+
+    public function onAutoLapPicked(val as Number) as Void {
+        manager.settings.autoLapDistanceMeters = val;
+        manager.settings.save();
+        if (autoLapItem != null) {
+            (autoLapItem as WatchUi.MenuItem).setSubLabel(manager.settings.getAutoLapLabel());
         }
     }
 
