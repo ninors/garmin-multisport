@@ -23,15 +23,15 @@ class PreStartView extends WatchUi.View {
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var splitY = 238;
+        var splitY = 264;
         // Subtle stylized dark background lines in top half
         dc.setColor(0x141414, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        dc.drawLine(40, 146, w - 40, 146);
-        dc.drawLine(30, 166, w - 30, 166);
-        dc.drawLine(25, 198, w - 25, 198);
+        dc.drawLine(40, 152, w - 40, 152);
+        dc.drawLine(30, 178, w - 30, 178);
+        dc.drawLine(25, 224, w - 25, 224);
 
-        // Deep dark-navy tint for bottom half (smaller, sleeker bottom section)
+        // Deep dark-navy tint for compact bottom rounded cap
         dc.setColor(0x0A1622, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, splitY, w, h - splitY);
 
@@ -104,29 +104,29 @@ class PreStartView extends WatchUi.View {
         // 7. Signature Bright Magenta/Red Smooth Faded Horizontal Divider Line
         GarminComponents.drawFadedHorizontalLine(dc, splitY, 16, w - 16, 0xFF0055, 0x88002B, 0x2A000E);
 
-        // 8. Bottom Half (compact & well-proportioned): Clock + Green Battery Icon
+        // 8. Compact Bottom Cap: Clock + Small Green Battery Icon
         var clock = System.getClockTime();
         var timeStr = clock.hour.format("%02d") + ":" + clock.min.format("%02d");
         var stats = System.getSystemStats();
         var battPct = stats.battery.toNumber();
 
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 16, 262, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        SportIcons.drawBatteryIcon(dc, cx + 22, 256, 22, 12, battPct);
+        dc.drawText(cx - 16, 286, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        SportIcons.drawBatteryIcon(dc, cx + 20, 280, 20, 11, battPct);
 
-        // 9. Compact crisp White 0:00 with Superscript 00 Hundredths
+        // 9. Smaller sleek White 0:00 with Superscript 00 Hundredths
         var mainZero = "0:00";
-        var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_NUMBER_MILD);
+        var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_MEDIUM);
         var zeroLeft = cx - (zeroW / 2) - 8;
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(zeroLeft, 308, Graphics.FONT_NUMBER_MILD, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(zeroLeft + zeroW + 3, 296, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft, 324, Graphics.FONT_MEDIUM, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft + zeroW + 3, 315, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // 10. Bottom Downward White Chevron "v"
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        dc.drawLine(cx - 8, 356, cx, 364);
-        dc.drawLine(cx, 364, cx + 8, 356);
+        dc.drawLine(cx - 7, 358, cx, 365);
+        dc.drawLine(cx, 365, cx + 7, 358);
 
         // 11. Native Garmin Glowing Cyan/Green START Bezel Arc on Top-Right
         GarminComponents.drawActionGlowArc(dc, 28, 0xAAFFCC, Theme.COLOR_GREEN_RING, 0x004422);
