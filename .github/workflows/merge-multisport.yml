@@ -5,6 +5,12 @@ on:
     # Run automatically every 30 minutes
     - cron: "*/30 * * * *"
   workflow_dispatch:
+    inputs:
+      test_upload:
+        description: "Upload a synthetic 5-leg Test Triathlon FIT to verify Garmin Connect"
+        required: false
+        default: "false"
+        type: string
 
 jobs:
   merge-multisport:
@@ -25,5 +31,5 @@ jobs:
         env:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
-          DELETE_ORIGINAL_LEGS: "false"
+          TEST_UPLOAD: ${{ github.event.inputs.test_upload || 'false' }}
         run: python tools/fit-merger/merge_multisport.py
