@@ -139,13 +139,14 @@ class FeelEvalDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        manager.feelRating = view.selected;
+        manager.commitSaveWithFeel(view.selected);
         var sumView = new SummaryView(manager);
         WatchUi.switchToView(sumView, new SummaryDelegate(manager, sumView), WatchUi.SLIDE_LEFT);
         return true;
     }
 
     function onBack() as Boolean {
+        manager.commitSaveWithFeel(view.selected);
         var sumView = new SummaryView(manager);
         WatchUi.switchToView(sumView, new SummaryDelegate(manager, sumView), WatchUi.SLIDE_LEFT);
         return true;

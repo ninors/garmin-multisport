@@ -54,6 +54,7 @@ module AppTests {
         }
         Test.assert(finished);
         Test.assertEqual(mgr.state, MultisportManager.STATE_SUMMARY);
+        mgr.commitSaveWithFeel(4);
 
         // 7. Reset back to Pre-Start
         mgr.resetToPreStart();

@@ -51,6 +51,145 @@ from garminconnect import Garmin
 TAG_REGEX = re.compile(r"^(?:\[MS:|MS\s+)(\d{6}_\d{4})\s+(\d+)[/-](\d+)\]?\s*(.+)$")
 MAX_CHAIN_GAP_SEC = 180  # Max 3 minutes gap between consecutive legs
 
+# Mapping from Watch App FitContributor `ms_sport` lap ID -> (FIT Sport, FIT SubSport)
+APP_SPORT_ID_MAP = {
+    0: (Sport.SWIMMING, SubSport.OPEN_WATER),
+    1: (Sport.SWIMMING, SubSport.LAP_SWIMMING),
+    2: (Sport.TRANSITION, SubSport.SWIM_TO_BIKE_TRANSITION),
+    3: (Sport.CYCLING, SubSport.GENERIC),
+    4: (Sport.TRANSITION, SubSport.BIKE_TO_RUN_TRANSITION),
+    5: (Sport.RUNNING, SubSport.GENERIC),
+    6: (Sport.RUNNING, SubSport.TRAIL),
+    7: (Sport.WALKING, SubSport.GENERIC),
+    8: (Sport.TRAINING, SubSport.CARDIO_TRAINING),
+    9: (Sport.ROWING, SubSport.GENERIC),
+}
+
+
+def try_split_continuous_fit(fit_path: Path, output_path: Path) -> bool:
+    """
+    If a single continuous FIT file contains FitContributor `ms_sport` lap tags
+    with 2+ distinct sport legs, split it into a native multi-session Garmin
+    Multisport FIT file. Returns True if split succeeded.
+    """
+    fit = FitFile.from_file(str(fit_path))
+    laps_with_sport: List[Tuple[LapMessage, int]] = []
+    all_records: List[RecordMessage] = []
+    file_id: Optional[FileIdMessage] = None
+    feel_level: Optional[int] = None
+
+    for rec in fit.records:
+        msg = rec.message
+        if isinstance(msg, FileIdMessage) and file_id is None:
+            file_id = msg
+        elif isinstance(msg, RecordMessage):
+            all_records.append(msg)
+        elif isinstance(msg, SessionMessage):
+            for f in getattr(msg, "developer_fields", []) or []:
+                if getattr(f, "field_id", None) == 1:
+                    vals = getattr(f, "values", None)
+                    if vals and vals[0] is not None:
+                        feel_level = int(vals[0])
+        elif isinstance(msg, LapMessage):
+            # Look for FitContributor developer field id=0 (`ms_sport`)
+            dev_sport = None
+            for f in getattr(msg, "developer_fields", []) or []:
+                if getattr(f, "field_id", None) == 0:
+                    vals = getattr(f, "values", None)
+                    if vals and vals[0] is not None:
+                        dev_sport = int(vals[0])
+                        break
+            if dev_sport is not None and dev_sport in APP_SPORT_ID_MAP:
+                laps_with_sport.append((msg, dev_sport))
+
+    if len(laps_with_sport) < 2 or file_id is None:
+        return False
+
+    # Group consecutive laps with the same sport ID into sessions
+    grouped_legs: List[Tuple[int, List[LapMessage]]] = []
+    for lap_msg, sp_id in laps_with_sport:
+        if grouped_legs and grouped_legs[-1][0] == sp_id:
+            grouped_legs[-1][1].append(lap_msg)
+        else:
+            grouped_legs.append((sp_id, [lap_msg]))
+
+    if len(grouped_legs) < 2:
+        return False
+
+    builder = FitFileBuilder(auto_define=True, min_string_size=50)
+    if getattr(file_id, "time_created", None):
+        file_id.time_created = int(file_id.time_created) + 1000
+    builder.add(file_id)
+
+    lap_idx = 0
+    total_timer = 0.0
+    last_ts = None
+
+    for sess_idx, (sp_id, leg_laps) in enumerate(grouped_legs):
+        fit_sport, fit_sub = APP_SPORT_ID_MAP[sp_id]
+        leg_start = leg_laps[0].start_time or leg_laps[0].timestamp
+        leg_end = leg_laps[-1].timestamp or leg_start
+        first_lap_idx = lap_idx
+
+        ev_s = EventMessage()
+        ev_s.timestamp = leg_start
+        ev_s.event = Event.TIMER
+        ev_s.event_type = EventType.START
+        builder.add(ev_s)
+
+        for r in all_records:
+            if r.timestamp is not None and leg_start is not None and leg_end is not None:
+                if leg_start <= r.timestamp <= leg_end:
+                    builder.add(r)
+
+        ev_e = EventMessage()
+        ev_e.timestamp = leg_end
+        ev_e.event = Event.TIMER
+        ev_e.event_type = EventType.STOP_ALL
+        builder.add(ev_e)
+
+        leg_timer = 0.0
+        leg_dist = 0.0
+        for lm in leg_laps:
+            lm.message_index = lap_idx
+            lm.sport = fit_sport
+            lm.sub_sport = fit_sub
+            builder.add(lm)
+            lap_idx += 1
+            if getattr(lm, "total_timer_time", None):
+                leg_timer += float(lm.total_timer_time)
+            if getattr(lm, "total_distance", None):
+                leg_dist += float(lm.total_distance)
+
+        sess = SessionMessage()
+        sess.message_index = sess_idx
+        sess.timestamp = leg_end
+        sess.start_time = leg_start
+        sess.total_elapsed_time = leg_timer
+        sess.total_timer_time = leg_timer
+        sess.total_distance = leg_dist
+        sess.sport = fit_sport
+        sess.sub_sport = fit_sub
+        sess.first_lap_index = first_lap_idx
+        sess.num_laps = len(leg_laps)
+        if feel_level is not None and 0 <= feel_level <= 4 and hasattr(sess, "workout_feel"):
+            sess.workout_feel = feel_level * 25  # 0, 25, 50, 75, 100 (Garmin native scale)
+        builder.add(sess)
+
+        total_timer += leg_timer
+        last_ts = leg_end
+
+    act = ActivityMessage()
+    if last_ts is not None:
+        act.timestamp = last_ts
+    act.total_timer_time = total_timer
+    act.num_sessions = len(grouped_legs)
+    act.type = Activity.AUTO_MULTI_SPORT
+    builder.add(act)
+
+    builder.build().to_file(str(output_path))
+    return True
+
 
 def parse_gmt_time(ts_str: str) -> Optional[datetime]:
     if not ts_str:
@@ -369,6 +508,36 @@ def main() -> int:
         tkey = (act.get("activityType") or {}).get("typeKey", "?")
         print(f"  - [{act.get('activityId')}] {act.get('startTimeGMT')} | {tkey} | {act.get('duration', 0):.0f}s | {act.get('activityName')}")
 
+    # Mode A: Check recent single-session continuous activities for FitContributor `ms_sport` lap tags
+    existing_ms_starts = [
+        parse_gmt_time(a.get("startTimeGMT") or "")
+        for a in activities
+        if "multi_sport" in (((a.get("activityType") or {}).get("typeKey") or "").lower())
+    ]
+    for act in activities[:10]:
+        tkey = ((act.get("activityType") or {}).get("typeKey") or "").lower()
+        if "multi_sport" in tkey:
+            continue
+        start_dt = parse_gmt_time(act.get("startTimeGMT") or "")
+        if start_dt and any(ms and abs((ms - start_dt).total_seconds()) <= 180.0 for ms in existing_ms_starts):
+            continue
+        if (act.get("lapCount") or 0) >= 2:
+            act_id = act["activityId"]
+            try:
+                zip_bytes = client.download_activity(act_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
+                raw_path = work_dir / f"single_{act_id}.fit"
+                raw_path.write_bytes(extract_fit_from_zip(zip_bytes))
+                split_path = work_dir / f"split_{act_id}_multisport.fit"
+                if try_split_continuous_fit(raw_path, split_path):
+                    print(f"Split continuous Multisport activity {act_id} -> uploading native Multisport FIT (original preserved!)...")
+                    resp = client.upload_activity(str(split_path))
+                    print(f"Upload response for split {act_id}: {resp}")
+                    if start_dt:
+                        existing_ms_starts.append(start_dt)
+            except Exception as ex:
+                print(f"Note: skipped continuous split check for {act_id}: {ex}")
+
+    # Mode B: Merge consecutive separate activities into a native Multisport FIT
     chains = detect_chronological_chains(activities)
     if not chains:
         print("No new consecutive multisport chains to merge.")

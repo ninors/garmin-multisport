@@ -1,6 +1,7 @@
 import Toybox.Activity;
 import Toybox.ActivityRecording;
 import Toybox.Attention;
+import Toybox.FitContributor;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.Position;
@@ -102,11 +103,14 @@ class MultisportManager {
     private var lastAltSample as Float;
     private var hasLastAlt as Boolean;
 
-    // Active FIT recording session
+    // Active continuous FIT recording session (keeps LiveTrack & audio 100% seamless!)
     private var session as ActivityRecording.Session?;
-    private var pendingSessionDelay as Number;
+    private var sportLapField as FitContributor.Field?;
+    private var feelSessionField as FitContributor.Field?;
     private var timer as Timer.Timer;
     private var segmentStartMs as Number;
+    private var segmentStartDistMeters as Float;
+    private var segmentStartCalories as Number;
     private var pauseStartMs as Number;
     private var accumulatedPauseMs as Number;
     private var lastSessionDist as Float;
@@ -173,13 +177,16 @@ class MultisportManager {
         hasLastAlt = false;
 
         session = null;
-        pendingSessionDelay = 0;
+        sportLapField = null;
+        feelSessionField = null;
         segmentStartMs = 0;
+        segmentStartDistMeters = 0.0f;
+        segmentStartCalories = 0;
         pauseStartMs = 0;
         accumulatedPauseMs = 0;
         lastSessionDist = 0.0f;
 
-        hrZones = loadHrZones();
+        hrZones = loadHrZonesForSport(getCurrentSport());
         rebuildProfile();
 
         timer = new Timer.Timer();
@@ -325,50 +332,73 @@ class MultisportManager {
 
         currentLegIndex = 0;
         state = STATE_ACTIVE;
-        startCurrentLegSession();
-        triggerFeedback(Attention.TONE_START, 100);
+        hrZones = loadHrZonesForSport(getCurrentSport());
+        startContinuousSession();
+        // Vibrate only (Garmin firmware already plays the native Start tone when session.start() runs)
+        triggerVibeOnly(100);
         showOverlay(OVERLAY_START, 0x00E64D, getCurrentSport(), "", "", 2);
     }
 
     // Move to the next leg/transition (BACK/LAP button)
+    // Uses session.addLap() on the single continuous session -> ZERO stop/start voice prompts,
+    // ZERO double-beeps, and 100% continuous LiveTrack!
     public function nextSegment() as Boolean {
         if (state != STATE_ACTIVE && state != STATE_PAUSED) {
             return false;
         }
 
-        // Finalize current leg
-        finalizeCurrentLegSession(true);
         var curSeg = getCurrentSegment();
         curSeg.completed = true;
         var prevTime = SportDefinitions.formatTime(curSeg.elapsedMs);
 
+        // Tag the completed lap with its exact SportType ID for the GitHub Multisport FIT converter
+        if (sportLapField != null) {
+            sportLapField.setData(curSeg.sportType);
+        }
+
         if (currentLegIndex + 1 >= legs.size()) {
-            // Completed final leg -> Summary
+            // Stop recording now; commitSaveWithFeel() will write the chosen smiley & save the FIT!
+            if (session != null && session.isRecording()) {
+                session.stop();
+            }
             state = STATE_SUMMARY;
-            triggerFeedback(Attention.TONE_SUCCESS, 150);
+            triggerVibeOnly(150);
             overlayType = OVERLAY_NONE;
             return true;
+        }
+
+        // Seamless lap marker inside the single continuous session!
+        if (session != null && session.isRecording()) {
+            session.addLap();
         }
 
         currentLegIndex++;
         state = STATE_ACTIVE;
         autoSportMatchTicks = 0;
-        // Reset leg timer immediately; defer ActivityRecording.createSession to next 1Hz tick
-        // because Garmin's session.save() flushes asynchronously!
+        hrZones = loadHrZonesForSport(getCurrentSport());
+
+        // Reset per-segment baseline offsets from the continuous session
         segmentStartMs = System.getTimer();
         accumulatedPauseMs = 0;
+        segmentStartDistMeters = lastSessionDist;
+        segmentStartCalories = totalCalories;
         lapStartElapsedMs = 0;
         lapStartDistMeters = 0.0f;
         lastAutoLapDistMeters = 0.0f;
-        lastSessionDist = 0.0f;
-        pendingSessionDelay = 2; // Wait 2s for async FIT flush before opening next session
-        triggerFeedback(Attention.TONE_LAP, 120);
+
+        // Pre-tag the new lap with the new sport
+        if (sportLapField != null) {
+            sportLapField.setData(getCurrentSport());
+        }
+
+        // Single clean lap feedback (no Stop/Start double tone!)
+        triggerFeedback(Attention.TONE_LAP, 100);
 
         var nextSport = getCurrentSport();
         var title = SportDefinitions.isTransition(nextSport)
             ? SportDefinitions.getSportShortName(nextSport)
             : SportDefinitions.getSportName(nextSport);
-        showOverlay(OVERLAY_TRANSITION, SportDefinitions.getSportColor(nextSport), nextSport, title, prevTime, 3);
+        showOverlay(OVERLAY_TRANSITION, SportDefinitions.getSportColor(nextSport), nextSport, title, prevTime, 2);
         return false;
     }
 
@@ -410,21 +440,35 @@ class MultisportManager {
 
     public function saveAndFinish() as Void {
         if (state == STATE_ACTIVE || state == STATE_PAUSED) {
-            finalizeCurrentLegSession(true);
+            if (sportLapField != null) {
+                sportLapField.setData(getCurrentSport());
+            }
+            if (session != null && session.isRecording()) {
+                session.stop();
+            }
             getCurrentSegment().completed = true;
             state = STATE_SUMMARY;
-            triggerFeedback(Attention.TONE_SUCCESS, 150);
+            triggerVibeOnly(150);
         }
     }
 
+    // Called from FeelEvalView right after the user picks their smiley (or skips)
+    public function commitSaveWithFeel(rating as Number) as Void {
+        feelRating = rating;
+        if (feelSessionField != null) {
+            feelSessionField.setData(rating);
+        }
+        finalizeContinuousSession(true);
+    }
+
     public function discardAll() as Void {
-        finalizeCurrentLegSession(false);
+        finalizeContinuousSession(false);
         state = STATE_PRE_START;
         totalElapsedMs = 0;
         totalDistanceMeters = 0.0f;
         totalCalories = 0;
         rebuildProfile();
-        triggerFeedback(Attention.TONE_RESET, 100);
+        triggerVibeOnly(100);
     }
 
     public function resetToPreStart() as Void {
@@ -435,20 +479,18 @@ class MultisportManager {
         rebuildProfile();
     }
 
-    private function startCurrentLegSession() as Void {
+    private function startContinuousSession() as Void {
         var sport = getCurrentSport();
         segmentStartMs = System.getTimer();
         accumulatedPauseMs = 0;
+        segmentStartDistMeters = 0.0f;
+        segmentStartCalories = 0;
         lapStartElapsedMs = 0;
         lapStartDistMeters = 0.0f;
         lastAutoLapDistMeters = 0.0f;
         lastSessionDist = 0.0f;
 
-        // Compact pure-ASCII tag MS YYMMDD_HHMM 1-5 SWIM (safe length & chars for fr165m FIT)
-        var sessionName = "MS " + msGroupId + " " +
-            (currentLegIndex + 1).toString() + "-" + legs.size().toString() + " " +
-            SportDefinitions.getFitSafeTag(sport);
-
+        var sessionName = "MS " + msGroupId + " " + SportDefinitions.getProfileName(settings.profileId);
         var opts = {
             :name => sessionName,
             :sport => SportDefinitions.getFitSport(sport),
@@ -461,16 +503,37 @@ class MultisportManager {
         try {
             session = ActivityRecording.createSession(opts);
             if (session != null) {
+                // Attach FitContributor LAP field (id=0) to record each leg's exact SportType
+                if (session has :createField) {
+                    sportLapField = session.createField(
+                        "ms_sport",
+                        0,
+                        FitContributor.DATA_TYPE_UINT8,
+                        {:mesgType => FitContributor.MESG_TYPE_LAP, :units => "id"}
+                    );
+                    if (sportLapField != null) {
+                        sportLapField.setData(sport);
+                    }
+                    feelSessionField = session.createField(
+                        "ms_feel",
+                        1,
+                        FitContributor.DATA_TYPE_UINT8,
+                        {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "lvl"}
+                    );
+                    if (feelSessionField != null) {
+                        feelSessionField.setData(feelRating);
+                    }
+                }
                 session.start();
             }
-            pendingSessionDelay = 0;
         } catch (ex) {
             session = null;
+            sportLapField = null;
+            feelSessionField = null;
         }
     }
 
-    private function finalizeCurrentLegSession(saveFile as Boolean) as Void {
-        pendingSessionDelay = 0;
+    private function finalizeContinuousSession(saveFile as Boolean) as Void {
         if (session != null) {
             try {
                 if (session.isRecording()) {
@@ -482,9 +545,10 @@ class MultisportManager {
                     session.discard();
                 }
             } catch (ex) {
-                // Safe guard against hardware recording state errors
             }
             session = null;
+            sportLapField = null;
+            feelSessionField = null;
         }
     }
 
@@ -579,12 +643,6 @@ class MultisportManager {
         }
 
         if (state == STATE_ACTIVE) {
-            if (pendingSessionDelay > 0 && session == null) {
-                pendingSessionDelay--;
-                if (pendingSessionDelay == 0) {
-                    startCurrentLegSession();
-                }
-            }
             checkAutoPause();
             if (!autoPaused) {
                 updateActiveMetrics();
@@ -650,19 +708,19 @@ class MultisportManager {
         var seg = getCurrentSegment();
         var actInfo = Activity.getActivityInfo();
 
-        // Elapsed time for segment
-        if (actInfo != null && actInfo has :timerTime && actInfo.timerTime != null && (actInfo.timerTime as Number) > 0) {
-            seg.elapsedMs = actInfo.timerTime as Number;
-        } else {
-            seg.elapsedMs = System.getTimer() - segmentStartMs - accumulatedPauseMs;
-        }
+        // Elapsed time for current segment (independent of continuous session total)
+        seg.elapsedMs = System.getTimer() - segmentStartMs - accumulatedPauseMs;
 
-        // Distance for segment
+        // Distance for current segment = delta from continuous session distance
         if (actInfo != null && actInfo has :elapsedDistance && actInfo.elapsedDistance != null) {
             var d = actInfo.elapsedDistance as Float;
             if (d >= lastSessionDist) {
-                seg.distanceMeters = d;
                 lastSessionDist = d;
+            }
+            var segD = lastSessionDist - segmentStartDistMeters;
+            if (segD < 0.0f) { segD = 0.0f; }
+            if (!SportDefinitions.isTransition(seg.sportType)) {
+                seg.distanceMeters = segD;
             }
         } else if (speedMps > 0.2f && !SportDefinitions.isTransition(seg.sportType)) {
             seg.distanceMeters += speedMps;
@@ -683,7 +741,10 @@ class MultisportManager {
                 power = actInfo.currentPower as Number;
             }
             if (actInfo has :calories && actInfo.calories != null) {
-                seg.calories = actInfo.calories as Number;
+                var totalCal = actInfo.calories as Number;
+                var segCal = totalCal - segmentStartCalories;
+                if (segCal < 0) { segCal = 0; }
+                seg.calories = segCal;
             }
         }
 
@@ -867,16 +928,34 @@ class MultisportManager {
         }
     }
 
-    // Heart rate zone utilities (0..4 for Z1..Z5)
-    private function loadHrZones() as Array<Number> {
+    public function triggerVibeOnly(vibeMs as Number) as Void {
+        if (settings.vibesEnabled && Attention has :vibrate) {
+            Attention.vibrate([new Attention.VibeProfile(75, vibeMs)]);
+        }
+    }
+
+    // Load user's REAL synced Garmin Connect HR zones per sport (Running, Cycling, Generic)
+    private function loadHrZonesForSport(sport as Number) as Array<Number> {
         try {
-            var profileZones = UserProfile.getHeartRateZones(UserProfile.HR_ZONE_SPORT_GENERIC);
+            var sportZoneType = UserProfile.HR_ZONE_SPORT_GENERIC;
+            if (SportDefinitions.isBike(sport) && UserProfile has :HR_ZONE_SPORT_BIKING) {
+                sportZoneType = UserProfile.HR_ZONE_SPORT_BIKING;
+            } else if ((sport == SportDefinitions.SPORT_RUN || sport == SportDefinitions.SPORT_TRAIL) && UserProfile has :HR_ZONE_SPORT_RUNNING) {
+                sportZoneType = UserProfile.HR_ZONE_SPORT_RUNNING;
+            } else if (SportDefinitions.isSwim(sport) && UserProfile has :HR_ZONE_SPORT_SWIMMING) {
+                sportZoneType = UserProfile.HR_ZONE_SPORT_SWIMMING;
+            }
+            var profileZones = UserProfile.getHeartRateZones(sportZoneType);
             if (profileZones != null && profileZones.size() >= 6) {
                 return profileZones;
             }
+            var genericZones = UserProfile.getHeartRateZones(UserProfile.HR_ZONE_SPORT_GENERIC);
+            if (genericZones != null && genericZones.size() >= 6) {
+                return genericZones;
+            }
         } catch (ex) {
         }
-        return [95, 115, 135, 155, 175, 195] as Array<Number>;
+        return [102, 122, 142, 162, 182, 200] as Array<Number>;
     }
 
     public function getHrZoneIndex(hr as Number) as Number {

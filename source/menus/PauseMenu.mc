@@ -54,6 +54,7 @@ class PauseMenuDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id == :settings) {
             MainSettingsMenu.push(manager);
         } else if (id == :discard) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             var confirm = new WatchUi.Confirmation("Ignorer l'activité ?");
             WatchUi.pushView(confirm, new DiscardConfirmDelegate(manager), WatchUi.SLIDE_UP);
         }
@@ -78,10 +79,13 @@ class DiscardConfirmDelegate extends WatchUi.ConfirmationDelegate {
     function onResponse(response as WatchUi.Confirm) as Boolean {
         if (response == WatchUi.CONFIRM_YES) {
             manager.discardAll();
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             var preView = new PreStartView(manager);
             var preDel = new PreStartDelegate(manager);
             WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
+        } else {
+            if (manager.state == MultisportManager.STATE_PAUSED) {
+                manager.togglePause();
+            }
         }
         return true;
     }
