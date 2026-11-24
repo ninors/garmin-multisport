@@ -230,28 +230,29 @@ module GarminComponents {
         }
     }
 
-    // Vertical pagination dots on the right curved edge
+    // Vertical pagination dots on the LEFT curved edge (solid white = active, hollow white ring = inactive)
     function drawPaginationDots(dc as Dc, currentPage as Number, totalPages as Number) as Void {
         if (totalPages <= 1) {
             return;
         }
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        var r = cx - 9;
+        var r = cx - 10;
         var stepDeg = 6.5f;
-        var startDeg = ((totalPages - 1).toFloat() * stepDeg) / 2.0f;
+        var halfSpan = ((totalPages - 1).toFloat() * stepDeg) / 2.0f;
 
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
         for (var i = 0; i < totalPages; i++) {
-            var deg = startDeg - (i.toFloat() * stepDeg);
+            // Left side (180 deg): top dot at (180 - halfSpan), bottom dot at (180 + halfSpan)
+            var deg = 180.0f - halfSpan + (i.toFloat() * stepDeg);
             var rad = deg * Math.PI / 180.0d;
             var dx = cx + (Math.cos(rad) * r).toNumber();
             var dy = cy - (Math.sin(rad) * r).toNumber();
             if (i == currentPage) {
-                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
                 dc.fillCircle(dx, dy, 4);
             } else {
-                dc.setColor(Theme.COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-                dc.fillCircle(dx, dy, 2);
+                dc.drawCircle(dx, dy, 3);
             }
         }
     }

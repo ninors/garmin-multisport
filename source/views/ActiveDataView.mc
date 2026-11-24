@@ -11,20 +11,24 @@ class ActiveDataView extends WatchUi.View {
     public static const TOTAL_PAGES = 6;
     private var manager as MultisportManager;
     public var currentPage as Number;
+    private var dotsVisibleUntilTick as Number;
 
     function initialize(mgr as MultisportManager) {
         View.initialize();
         manager = mgr;
         currentPage = 0;
+        dotsVisibleUntilTick = mgr.tickCount + 3;
     }
 
     public function nextPage() as Void {
         currentPage = (currentPage + 1) % TOTAL_PAGES;
+        dotsVisibleUntilTick = manager.tickCount + 3;
         WatchUi.requestUpdate();
     }
 
     public function prevPage() as Void {
         currentPage = (currentPage - 1 + TOTAL_PAGES) % TOTAL_PAGES;
+        dotsVisibleUntilTick = manager.tickCount + 3;
         WatchUi.requestUpdate();
     }
 
@@ -51,8 +55,10 @@ class ActiveDataView extends WatchUi.View {
             drawPage5ClockBattery(dc);
         }
 
-        // Right-edge pagination dots
-        GarminComponents.drawPaginationDots(dc, currentPage, TOTAL_PAGES);
+        // Left-edge pagination dots (auto-hide after 3 seconds until page changes)
+        if (manager.tickCount <= dotsVisibleUntilTick) {
+            GarminComponents.drawPaginationDots(dc, currentPage, TOTAL_PAGES);
+        }
 
         // Lock icon indicator if locked
         if (manager.isLocked) {
@@ -440,29 +446,29 @@ class ActiveDataView extends WatchUi.View {
         dc.fillPolygon(pts);
     }
 
-    // PAGE 4: EXACT Native Garmin Forerunner 965 Elevation Profile Screen (Photo 1!)
-    // Green twin mountain peak | Huge white Altitude | Green curve + min/max markers + right axis + time ticks | Bottom elapsed time
+    // PAGE 4: Native Garmin Elevation Profile Screen
+    // Progressive left-to-right growth, NO right Y-axis, clean compact top altitude
     private function drawPage4ElevationProfile(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
 
         // 1. Top center: Crisp green twin-mountain peak icon
         dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        var mtn1 = [[cx - 16, 56], [cx - 4, 38], [cx + 8, 56]] as Array<[Numeric, Numeric]>;
-        var mtn2 = [[cx - 2, 56], [cx + 8, 44], [cx + 18, 56]] as Array<[Numeric, Numeric]>;
+        var mtn1 = [[cx - 14, 54], [cx - 3, 38], [cx + 8, 54]] as Array<[Numeric, Numeric]>;
+        var mtn2 = [[cx - 1, 54], [cx + 8, 43], [cx + 16, 54]] as Array<[Numeric, Numeric]>;
         dc.fillPolygon(mtn1);
         dc.fillPolygon(mtn2);
 
-        // 2. Huge crisp white Altitude value (e.g. "204")
+        // 2. Clean medium-sized white Altitude value (e.g. "204")
         var altNum = manager.altitude.toNumber();
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 104, Graphics.FONT_NUMBER_HOT, altNum.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 96, Graphics.FONT_NUMBER_MILD, altNum.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 3. Elevation Graph box (x: 56..296, y: 158..284)
+        // 3. Centered Elevation Graph box (NO right Y-axis, clean full width x: 56..334, y: 152..282)
         var gx = 56;
-        var gw = 240;
-        var gyTop = 158;
-        var gyBot = 284;
+        var gw = w - 112;
+        var gyTop = 152;
+        var gyBot = 282;
         var gh = gyBot - gyTop;
 
         // Subtle horizontal reference grid lines
@@ -472,7 +478,7 @@ class ActiveDataView extends WatchUi.View {
         dc.drawLine(gx, gyTop + (gh / 2), gx + gw, gyTop + (gh / 2));
 
         var count = manager.altHistory.size();
-        if (count >= 2) {
+        if (count >= 1) {
             var minA = manager.altHistory[0];
             var maxA = minA;
             var minIdx = 0;
@@ -484,14 +490,11 @@ class ActiveDataView extends WatchUi.View {
             }
             var span = maxA - minA;
             if (span < 10.0f) { span = 10.0f; }
-            var midA = (minA + maxA) / 2.0f;
 
-            // Right Y-axis labels (exact photo: max top-right, mid middle-right)
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(gx + gw + 8, gyTop, Graphics.FONT_XTINY, maxA.toNumber().toString(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(gx + gw + 8, gyTop + (gh / 2), Graphics.FONT_XTINY, midA.toNumber().toString(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            // Progressive left-to-right growth: starts from left edge point-by-point
+            // instead of stretching 2 points across the whole screen!
+            var denom = (count < 24) ? 23.0f : (count - 1).toFloat();
 
-            // Shaded dark-green area under curve + bright green elevation curve
             var prevX = gx;
             var prevY = gyBot - (((manager.altHistory[0] - minA) / span) * gh.toFloat()).toNumber();
             var maxPx = prevX;
@@ -500,7 +503,7 @@ class ActiveDataView extends WatchUi.View {
             var minPy = prevY;
 
             for (var j = 1; j < count; j++) {
-                var px = gx + ((j.toFloat() / (count - 1).toFloat()) * gw.toFloat()).toNumber();
+                var px = gx + ((j.toFloat() / denom) * gw.toFloat()).toNumber();
                 var py = gyBot - (((manager.altHistory[j] - minA) / span) * gh.toFloat()).toNumber();
                 if (j == maxIdx) { maxPx = px; maxPy = py; }
                 if (j == minIdx) { minPx = px; minPy = py; }
@@ -521,22 +524,18 @@ class ActiveDataView extends WatchUi.View {
                 prevY = py;
             }
 
-            // Bright white dot at current (rightmost) point
+            // Bright white dot at the latest point
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.fillCircle(prevX, prevY, 4);
 
-            // High & Low peak markers + crisp numbers on the chart (exact photo!)
-            dc.drawText(maxPx, maxPy + 14, Graphics.FONT_XTINY, maxA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(minPx, minPy - 14, Graphics.FONT_XTINY, minA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else {
-            dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-            dc.setPenWidth(3);
-            dc.drawLine(gx, gyTop + (gh / 2), gx + gw, gyTop + (gh / 2));
-            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.fillCircle(gx + gw, gyTop + (gh / 2), 4);
+            // Show high/low labels once curve has meaningful vertical spread
+            if (count >= 3 && (maxA - minA) >= 3.0f) {
+                dc.drawText(maxPx, maxPy + 14, Graphics.FONT_XTINY, maxA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.drawText(minPx, minPy - 14, Graphics.FONT_XTINY, minA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
 
-        // 4. Horizontal bottom axis line with 4 tick marks (exact photo)
+        // 4. Horizontal bottom axis line with 4 tick marks
         dc.setColor(0x555555, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
         dc.drawLine(gx, gyBot, gx + gw, gyBot);

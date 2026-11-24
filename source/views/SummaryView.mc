@@ -6,20 +6,24 @@ class SummaryView extends WatchUi.View {
     public static const TOTAL_PAGES = 4;
     private var manager as MultisportManager;
     public var page as Number;
+    private var dotsVisibleUntilTick as Number;
 
     function initialize(mgr as MultisportManager) {
         View.initialize();
         manager = mgr;
         page = 0;
+        dotsVisibleUntilTick = mgr.tickCount + 3;
     }
 
     public function nextPage() as Void {
         page = (page + 1) % TOTAL_PAGES;
+        dotsVisibleUntilTick = manager.tickCount + 3;
         WatchUi.requestUpdate();
     }
 
     public function prevPage() as Void {
         page = (page - 1 + TOTAL_PAGES) % TOTAL_PAGES;
+        dotsVisibleUntilTick = manager.tickCount + 3;
         WatchUi.requestUpdate();
     }
 
@@ -38,7 +42,9 @@ class SummaryView extends WatchUi.View {
             drawTrainingEffectPage(dc);
         }
 
-        GarminComponents.drawPaginationDots(dc, page, TOTAL_PAGES);
+        if (manager.tickCount <= dotsVisibleUntilTick) {
+            GarminComponents.drawPaginationDots(dc, page, TOTAL_PAGES);
+        }
     }
 
     // PAGE 0: EXACT Official Garmin Forerunner 965 Multisport Summary (Photo 3!)
