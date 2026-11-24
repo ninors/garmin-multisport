@@ -23,13 +23,13 @@ class PreStartView extends WatchUi.View {
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var splitY = 224;
+        var splitY = 216;
         // Subtle stylized dark background lines in top half
         dc.setColor(0x141414, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
-        dc.drawLine(40, 146, w - 40, 146);
-        dc.drawLine(30, 162, w - 30, 162);
-        dc.drawLine(25, 190, w - 25, 190);
+        dc.drawLine(40, 144, w - 40, 144);
+        dc.drawLine(30, 160, w - 30, 160);
+        dc.drawLine(25, 186, w - 25, 186);
 
         // Deep dark-navy tint for bottom half (like native FR965 pre-start screen)
         dc.setColor(0x0A1622, Graphics.COLOR_TRANSPARENT);
@@ -101,34 +101,32 @@ class PreStartView extends WatchUi.View {
         dc.fillCircle(22, cy, 3);
         dc.fillCircle(24, cy + 12, 3);
 
-        // 7. Signature Bright Magenta/Red Horizontal Accent Divider Line (exact photo)
-        dc.setColor(0xFF0055, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
-        dc.drawLine(16, splitY, w - 16, splitY);
+        // 7. Signature Bright Magenta/Red Smooth Faded Horizontal Divider Line
+        GarminComponents.drawFadedHorizontalLine(dc, splitY, 16, w - 16, 0xFF0055, 0x88002B, 0x2A000E);
 
-        // 8. Bottom Half: Current Clock + Green Battery Icon (exact photo)
+        // 8. Bottom Half: Current Clock + Green Battery Icon (clean breathing room above 0:00)
         var clock = System.getClockTime();
         var timeStr = clock.hour.format("%02d") + ":" + clock.min.format("%02d");
         var stats = System.getSystemStats();
         var battPct = stats.battery.toNumber();
 
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 16, 256, Graphics.FONT_SMALL, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        SportIcons.drawBatteryIcon(dc, cx + 32, 249, 26, 14, battPct);
+        dc.drawText(cx - 18, 244, Graphics.FONT_TINY, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        SportIcons.drawBatteryIcon(dc, cx + 26, 237, 26, 14, battPct);
 
-        // 9. Huge White 0:00 with Superscript 00 Hundredths (exact photo: 0:00⁰⁰)
+        // 9. Crisp White 0:00 with Superscript 00 Hundredths (well-spaced above chevron)
         var mainZero = "0:00";
-        var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_NUMBER_HOT);
+        var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_NUMBER_MEDIUM);
         var zeroLeft = cx - (zeroW / 2) - 10;
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(zeroLeft, 312, Graphics.FONT_NUMBER_HOT, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(zeroLeft + zeroW + 4, 298, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft, 304, Graphics.FONT_NUMBER_MEDIUM, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft + zeroW + 4, 290, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 10. Bottom Downward White Chevron "v" (exact photo)
+        // 10. Bottom Downward White Chevron "v"
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(3);
-        dc.drawLine(cx - 9, 358, cx, 367);
-        dc.drawLine(cx, 367, cx + 9, 358);
+        dc.drawLine(cx - 9, 356, cx, 365);
+        dc.drawLine(cx, 365, cx + 9, 356);
 
         // 11. Subtle Green START Bezel Accent on Top-Right (exact photo)
         dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);

@@ -139,12 +139,15 @@ class ActiveDataView extends WatchUi.View {
         var sport = seg.sportType;
         var sportColor = SportDefinitions.getSportColor(sport);
 
-        // Top: Material SVG sport icon + customizable Top field (default CHRONO)
+        // Top: Material SVG sport icon dynamically positioned to NEVER overlap text!
         var topField = manager.settings.getFieldTopForSport(sport);
         var topLabel = getDynamicFieldLabel(topField, seg);
-        SportIcons.drawSportIcon(dc, sport, cx - 64, 36, 14, sportColor);
+        var topLblW = dc.getTextWidthInPixels(topLabel, Graphics.FONT_XTINY);
+        var topGroupW = 32 + topLblW;
+        var topStartX = cx - (topGroupW / 2);
+        SportIcons.drawSportIcon(dc, sport, topStartX + 12, 36, 14, sportColor);
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 10, 36, Graphics.FONT_XTINY, topLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(topStartX + 30, 36, Graphics.FONT_XTINY, topLabel, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         if (topField == SportDefinitions.FIELD_CHRONO) {
             GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 84, Theme.COLOR_WHITE);
@@ -189,41 +192,50 @@ class ActiveDataView extends WatchUi.View {
     private function getDynamicFieldLabel(fieldId as Number, seg as SegmentData) as String {
         if (fieldId == SportDefinitions.FIELD_DISTANCE) {
             var unit = SportDefinitions.getDistanceUnit(seg.distanceMeters, SportDefinitions.isSwim(seg.sportType));
-            return "DIST. (" + unit + ")";
+            return "DIST. " + unit;
         } else if (fieldId == SportDefinitions.FIELD_SPEED) {
-            return "VIT. (km/h)";
+            return "VIT. km/h";
         } else if (fieldId == SportDefinitions.FIELD_PACE) {
-            return SportDefinitions.isSwim(seg.sportType) ? "ALL. /100m" : "ALLURE";
+            return SportDefinitions.isSwim(seg.sportType) ? "ALL. /100" : "ALLURE";
         }
         return SportDefinitions.getFieldLabel(fieldId);
     }
 
-    // PAGE 1: Detailed Current Segment / Lap Data (clean native FR965 4-field grid)
+    // PAGE 1: Detailed Current Segment / Lap Data (smooth faded lines + zero icon/text overlap!)
     private function drawPage1SegmentDetail(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
         var seg = manager.getCurrentSegment();
         var sport = seg.sportType;
         var sportColor = SportDefinitions.getSportColor(sport);
-        var divColor = SportDefinitions.isTransition(sport) ? 0xFFCC00 : Theme.COLOR_RED_DIVIDER;
+        var isTrans = SportDefinitions.isTransition(sport);
 
-        // Header safely centered inside top circular chord
-        SportIcons.drawSportIcon(dc, sport, cx - 58, 48, 14, sportColor);
+        // Dynamically centered header (icon NEVER overlaps sport name!)
+        var hdrText = SportDefinitions.getSportShortName(sport) + " T" + seg.lapCount.toString();
+        var hdrW = dc.getTextWidthInPixels(hdrText, Graphics.FONT_TINY);
+        var hdrGroupW = 34 + hdrW;
+        var hdrStartX = cx - (hdrGroupW / 2);
+        SportIcons.drawSportIcon(dc, sport, hdrStartX + 12, 48, 14, sportColor);
         dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 12, 48, Graphics.FONT_TINY,
-            SportDefinitions.getSportShortName(sport) + " T" + seg.lapCount.toString(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(hdrStartX + 32, 48, Graphics.FONT_TINY, hdrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Clean FR965 Cross Grid
-        dc.setColor(divColor, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(28, 82, w - 28, 82);
-        dc.drawLine(14, 195, w - 14, 195);
-        dc.drawLine(28, 308, w - 28, 308);
+        // Smooth Faded FR965 Dividers on ALL lines!
+        if (isTrans) {
+            GarminComponents.drawFadedHorizontalLine(dc, 82, 24, w - 24, 0xFFCC00, 0x886600, 0x332200);
+            GarminComponents.drawFadedHorizontalLine(dc, 195, 14, w - 14, 0xFFCC00, 0x886600, 0x332200);
+            GarminComponents.drawFadedHorizontalLine(dc, 308, 24, w - 24, 0xFFCC00, 0x886600, 0x332200);
+            dc.setColor(0xFFCC00, Graphics.COLOR_TRANSPARENT);
+        } else {
+            GarminComponents.drawFadedHorizontalLine(dc, 82, 24, w - 24, 0xFF0033, 0x88001A, 0x2A0008);
+            GarminComponents.drawFadedHorizontalLine(dc, 195, 14, w - 14, 0xFF0033, 0x88001A, 0x2A0008);
+            GarminComponents.drawFadedHorizontalLine(dc, 308, 24, w - 24, 0xFF0033, 0x88001A, 0x2A0008);
+            dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
+        }
+        dc.setPenWidth(3);
         dc.drawLine(cx, 82, cx, 308);
 
-        var lCx = (cx / 2) + 8;
-        var rCx = cx + (cx / 2) - 8;
+        var lCx = (cx / 2) + 14;
+        var rCx = cx + (cx / 2) - 14;
 
         // Top-Left: Segment Time
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
@@ -231,10 +243,10 @@ class ActiveDataView extends WatchUi.View {
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(lCx, 150, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(seg.elapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Top-Right: Segment Distance
+        // Top-Right: Segment Distance (compact label, never clipped!)
         var distUnit = SportDefinitions.getDistanceUnit(seg.distanceMeters, SportDefinitions.isSwim(sport));
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rCx, 108, Graphics.FONT_XTINY, "DIST. (" + distUnit + ")", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rCx, 108, Graphics.FONT_XTINY, "DIST. " + distUnit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(rCx, 150, Graphics.FONT_MEDIUM, SportDefinitions.formatDistance(seg.distanceMeters, SportDefinitions.isSwim(sport)), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -284,9 +296,7 @@ class ActiveDataView extends WatchUi.View {
             SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(46, 126, w - 46, 126);
+        GarminComponents.drawFadedHorizontalLine(dc, 126, 36, w - 36, 0xFF0033, 0x88001A, 0x2A0008);
 
         // Clean leg rows centered inside circular safe zone (y = 148..324) — ZERO overlap!
         var maxRows = (manager.segments.size() > 5) ? 5 : manager.segments.size();
@@ -430,56 +440,80 @@ class ActiveDataView extends WatchUi.View {
         dc.fillPolygon(pts);
     }
 
-    // PAGE 4: Native Garmin Elevation & Elevation Profile Area Chart
+    // PAGE 4: EXACT Native Garmin Forerunner 965 Elevation Profile Screen (Photo 1!)
+    // Green twin mountain peak | Huge white Altitude | Green curve + min/max markers + right axis + time ticks | Bottom elapsed time
     private function drawPage4ElevationProfile(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
 
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 44, Graphics.FONT_XTINY, "ALTITUDE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // 1. Top center: Crisp green twin-mountain peak icon
+        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+        var mtn1 = [[cx - 16, 56], [cx - 4, 38], [cx + 8, 56]] as Array<[Numeric, Numeric]>;
+        var mtn2 = [[cx - 2, 56], [cx + 8, 44], [cx + 18, 56]] as Array<[Numeric, Numeric]>;
+        dc.fillPolygon(mtn1);
+        dc.fillPolygon(mtn2);
 
+        // 2. Huge crisp white Altitude value (e.g. "204")
         var altNum = manager.altitude.toNumber();
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 88, Graphics.FONT_NUMBER_MILD, altNum.toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 104, Graphics.FONT_NUMBER_HOT, altNum.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 56, 130, Graphics.FONT_XTINY, "D+ " + manager.totalAscent.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_GPS_RED, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 56, 130, Graphics.FONT_XTINY, "D- " + manager.totalDescent.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        GarminComponents.drawFadedHorizontalLine(dc, 152, 24, w - 24, 0x00CC44, 0x006622, 0x00220A);
-
-        var gx = 52;
-        var gw = w - 104;
-        var gyTop = 180;
-        var gyBot = 316;
+        // 3. Elevation Graph box (x: 56..296, y: 158..284)
+        var gx = 56;
+        var gw = 240;
+        var gyTop = 158;
+        var gyBot = 284;
         var gh = gyBot - gyTop;
+
+        // Subtle horizontal reference grid lines
+        dc.setColor(0x202020, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(1);
+        dc.drawLine(gx, gyTop, gx + gw, gyTop);
+        dc.drawLine(gx, gyTop + (gh / 2), gx + gw, gyTop + (gh / 2));
 
         var count = manager.altHistory.size();
         if (count >= 2) {
             var minA = manager.altHistory[0];
             var maxA = minA;
+            var minIdx = 0;
+            var maxIdx = 0;
             for (var i = 1; i < count; i++) {
                 var a = manager.altHistory[i];
-                if (a < minA) { minA = a; }
-                if (a > maxA) { maxA = a; }
+                if (a < minA) { minA = a; minIdx = i; }
+                if (a > maxA) { maxA = a; maxIdx = i; }
             }
             var span = maxA - minA;
             if (span < 10.0f) { span = 10.0f; }
+            var midA = (minA + maxA) / 2.0f;
 
+            // Right Y-axis labels (exact photo: max top-right, mid middle-right)
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(gx + gw + 8, gyTop, Graphics.FONT_XTINY, maxA.toNumber().toString(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(gx + gw + 8, gyTop + (gh / 2), Graphics.FONT_XTINY, midA.toNumber().toString(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+            // Shaded dark-green area under curve + bright green elevation curve
             var prevX = gx;
             var prevY = gyBot - (((manager.altHistory[0] - minA) / span) * gh.toFloat()).toNumber();
+            var maxPx = prevX;
+            var maxPy = prevY;
+            var minPx = prevX;
+            var minPy = prevY;
+
             for (var j = 1; j < count; j++) {
                 var px = gx + ((j.toFloat() / (count - 1).toFloat()) * gw.toFloat()).toNumber();
                 var py = gyBot - (((manager.altHistory[j] - minA) / span) * gh.toFloat()).toNumber();
+                if (j == maxIdx) { maxPx = px; maxPy = py; }
+                if (j == minIdx) { minPx = px; minPy = py; }
+
                 var quad = [
                     [prevX, prevY],
                     [px, py],
                     [px, gyBot],
                     [prevX, gyBot]
                 ] as Array<[Numeric, Numeric]>;
-                dc.setColor(0x003D18, Graphics.COLOR_TRANSPARENT);
+                dc.setColor(0x002E12, Graphics.COLOR_TRANSPARENT);
                 dc.fillPolygon(quad);
+
                 dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
                 dc.setPenWidth(3);
                 dc.drawLine(prevX, prevY, px, py);
@@ -487,16 +521,33 @@ class ActiveDataView extends WatchUi.View {
                 prevY = py;
             }
 
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(gx, 168, Graphics.FONT_XTINY, maxA.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(gx + gw, 336, Graphics.FONT_XTINY, minA.toNumber().toString() + "m", Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            // Bright white dot at current (rightmost) point
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.fillCircle(prevX, prevY, 4);
+
+            // High & Low peak markers + crisp numbers on the chart (exact photo!)
+            dc.drawText(maxPx, maxPy + 14, Graphics.FONT_XTINY, maxA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(minPx, minPy - 14, Graphics.FONT_XTINY, minA.toNumber().toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
-            dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
-            dc.setPenWidth(2);
-            dc.drawLine(gx, gyBot - 30, gx + gw, gyBot - 30);
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, 250, Graphics.FONT_XTINY, "PROFIL ALTITUDE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(3);
+            dc.drawLine(gx, gyTop + (gh / 2), gx + gw, gyTop + (gh / 2));
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.fillCircle(gx + gw, gyTop + (gh / 2), 4);
         }
+
+        // 4. Horizontal bottom axis line with 4 tick marks (exact photo)
+        dc.setColor(0x555555, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(gx, gyBot, gx + gw, gyBot);
+        for (var tk = 0; tk <= 4; tk++) {
+            var tx = gx + ((gw * tk) / 4);
+            dc.drawLine(tx, gyBot - 4, tx, gyBot + 4);
+        }
+
+        // 5. Bottom center: Elapsed time (e.g. "1:21:13")
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 320, Graphics.FONT_SMALL, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // PAGE 5: Pure Minimalist Native Garmin Clock & Battery on Pure Black

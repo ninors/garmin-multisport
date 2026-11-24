@@ -117,11 +117,8 @@ class SummaryView extends WatchUi.View {
         }
     }
 
-    // PAGE 1: ÉTAPES (Per-Segment Breakdown)
+    // PAGE 1: ÉTAPES (Per-Segment Breakdown — clean spacing, zero overlap!)
     private function drawSegmentsPage(dc as Dc) as Void {
-        var w = dc.getWidth();
-        var cx = w / 2;
-
         drawTopHeader(dc, "ÉTAPES", 0x00AAFF);
 
         var count = manager.segments.size();
@@ -134,20 +131,21 @@ class SummaryView extends WatchUi.View {
             var y = startY + (i * rowH);
             var sColor = SportDefinitions.getSportColor(seg.sportType);
 
-            SportIcons.drawSportIcon(dc, seg.sportType, 62, y, 12, sColor);
+            SportIcons.drawSportIcon(dc, seg.sportType, 58, y, 12, sColor);
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(86, y - 9, Graphics.FONT_XTINY, SportDefinitions.getSportName(seg.sportType), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(82, y - 9, Graphics.FONT_XTINY, SportDefinitions.getSportName(seg.sportType), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
             var sub = "Transition";
             if (!SportDefinitions.isTransition(seg.sportType)) {
                 var u = SportDefinitions.getDistanceUnit(seg.distanceMeters, SportDefinitions.isSwim(seg.sportType));
-                sub = SportDefinitions.formatDistance(seg.distanceMeters, SportDefinitions.isSwim(seg.sportType)) + " " + u + " • FC " + seg.getAvgHeartRate().toString();
+                var hrPart = (seg.getAvgHeartRate() > 0) ? (" • " + seg.getAvgHeartRate().toString()) : "";
+                sub = SportDefinitions.formatDistance(seg.distanceMeters, SportDefinitions.isSwim(seg.sportType)) + u + hrPart;
             }
             dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(86, y + 11, Graphics.FONT_XTINY, sub, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(82, y + 11, Graphics.FONT_XTINY, sub, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
             dc.setColor(sColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(330, y, Graphics.FONT_TINY, SportDefinitions.formatTime(seg.elapsedMs), Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(334, y, Graphics.FONT_XTINY, SportDefinitions.formatTime(seg.elapsedMs), Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
         drawFooterHint(dc, "ZONES FC");

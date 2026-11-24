@@ -43,25 +43,40 @@ module GarminComponents {
         dc.drawText(startX + 22, 44, Theme.fMedium as Graphics.FontType, hrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Signature FR965 Faded Horizontal Divider Line (thick bright center, fades smoothly to edges)
+    // Signature FR965 Smooth 7-Step Faded Horizontal Divider Line (used on ALL red/yellow lines!)
     function drawFadedHorizontalLine(dc as Dc, y as Number, x1 as Number, x2 as Number, brightColor as Number, midColor as Number, dimColor as Number) as Void {
         var span = x2 - x1;
-        var e1 = x1 + (span / 8);
-        var e2 = x1 + (span / 4);
-        var e3 = x2 - (span / 4);
-        var e4 = x2 - (span / 8);
+        var s1 = span / 16;
+        var s2 = span / 8;
+        var s3 = (span * 3) / 16;
+        var s4 = span / 4;
 
         dc.setPenWidth(3);
+        // Very dark outer tips
+        var darkTip = ((dimColor >> 1) & 0x7F7F7F);
+        dc.setColor(darkTip, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(x1, y, x1 + s1, y);
+        dc.drawLine(x2 - s1, y, x2, y);
+
+        // Dim step
         dc.setColor(dimColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1, y, e1, y);
-        dc.drawLine(e4, y, x2, y);
+        dc.drawLine(x1 + s1, y, x1 + s2, y);
+        dc.drawLine(x2 - s2, y, x2 - s1, y);
 
+        // Mid step
         dc.setColor(midColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(e1, y, e2, y);
-        dc.drawLine(e3, y, e4, y);
+        dc.drawLine(x1 + s2, y, x1 + s3, y);
+        dc.drawLine(x2 - s3, y, x2 - s2, y);
 
+        // Semi-bright step
+        var semiBright = (((brightColor & 0xFEFEFE) >> 1) + ((midColor & 0xFEFEFE) >> 1));
+        dc.setColor(semiBright, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(x1 + s3, y, x1 + s4, y);
+        dc.drawLine(x2 - s4, y, x2 - s3, y);
+
+        // Bright crisp center
         dc.setColor(brightColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(e2, y, e3, y);
+        dc.drawLine(x1 + s4, y, x2 - s4, y);
     }
 
     // Bottom 5-zone HR arc — EXACT Forerunner 965 style (thin inactive zones, THICK active zone + white vertical tick!)
