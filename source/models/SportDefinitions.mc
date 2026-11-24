@@ -13,12 +13,14 @@ module SportDefinitions {
     const SPORT_TRAIL = 6;
     const SPORT_WALK = 7;
     const SPORT_CARDIO = 8;
+    const SPORT_ROW = 9;
 
     // Multisport profile identifiers
     const PROFILE_TRIATHLON = 0;
     const PROFILE_DUATHLON = 1;
     const PROFILE_SWIMRUN = 2;
-    const PROFILE_CUSTOM = 3;
+    const PROFILE_AQUATHLON = 3;
+    const PROFILE_CUSTOM = 4;
 
     // Customizable data field identifiers
     const FIELD_DISTANCE = 0;
@@ -47,6 +49,7 @@ module SportDefinitions {
             case SPORT_TRAIL: return "Trail";
             case SPORT_WALK: return "Marche";
             case SPORT_CARDIO: return "Cardio";
+            case SPORT_ROW: return "Aviron";
             default: return "Sport";
         }
     }
@@ -62,6 +65,7 @@ module SportDefinitions {
             case SPORT_TRAIL: return "TRAIL";
             case SPORT_WALK: return "MARCHE";
             case SPORT_CARDIO: return "CARDIO";
+            case SPORT_ROW: return "AVIRON";
             default: return "SPORT";
         }
     }
@@ -84,6 +88,8 @@ module SportDefinitions {
                 return 0x00DDBB; // Turquoise marche
             case SPORT_CARDIO:
                 return 0xFF0055; // Magenta cardio
+            case SPORT_ROW:
+                return 0x00CCFF; // Bleu aviron
             default:
                 return 0xFFFFFF;
         }
@@ -100,6 +106,7 @@ module SportDefinitions {
             case SPORT_TRAIL: return "TRAIL";
             case SPORT_WALK: return "WALK";
             case SPORT_CARDIO: return "CARDIO";
+            case SPORT_ROW: return "ROW";
             default: return "SPORT";
         }
     }
@@ -121,6 +128,8 @@ module SportDefinitions {
                 return Activity.SPORT_WALKING;
             case SPORT_CARDIO:
                 return Activity.SPORT_TRAINING;
+            case SPORT_ROW:
+                return Activity.SPORT_ROWING;
             default:
                 return Activity.SPORT_GENERIC;
         }
@@ -159,6 +168,7 @@ module SportDefinitions {
             case PROFILE_TRIATHLON: return "Triathlon";
             case PROFILE_DUATHLON: return "Duathlon";
             case PROFILE_SWIMRUN: return "Swimrun";
+            case PROFILE_AQUATHLON: return "Aquathlon";
             case PROFILE_CUSTOM: return "Multisport Perso";
             default: return "Triathlon";
         }
@@ -213,6 +223,8 @@ module SportDefinitions {
             baseSports = [SPORT_RUN, SPORT_BIKE, SPORT_RUN] as Array<Number>;
         } else if (profileId == PROFILE_SWIMRUN) {
             baseSports = [swimType, SPORT_RUN, swimType, SPORT_RUN] as Array<Number>;
+        } else if (profileId == PROFILE_AQUATHLON) {
+            baseSports = [swimType, SPORT_RUN] as Array<Number>;
         } else {
             if (customSports.size() >= 2) {
                 for (var i = 0; i < customSports.size(); i++) {

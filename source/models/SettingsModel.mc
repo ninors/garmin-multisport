@@ -5,6 +5,7 @@ class SettingsModel {
     public var profileId as Number;
     public var transitionsEnabled as Boolean;
     public var autoSportChange as Boolean;
+    public var autoPauseEnabled as Boolean;
     public var swimPoolMode as Boolean;
     public var poolLengthMeters as Number;
     public var autoLapDistanceMeters as Number;
@@ -40,6 +41,7 @@ class SettingsModel {
         profileId = loadNumber("profileId", SportDefinitions.PROFILE_TRIATHLON);
         transitionsEnabled = loadBool("transitionsEnabled", true);
         autoSportChange = loadBool("autoSportChange", false);
+        autoPauseEnabled = loadBool("autoPauseEnabled", false);
         swimPoolMode = loadBool("swimPoolMode", false);
         poolLengthMeters = loadNumber("poolLengthMeters", 25);
         autoLapDistanceMeters = loadNumber("autoLapDistanceMeters", 1000);
@@ -81,6 +83,7 @@ class SettingsModel {
         Storage.setValue("profileId", profileId);
         Storage.setValue("transitionsEnabled", transitionsEnabled);
         Storage.setValue("autoSportChange", autoSportChange);
+        Storage.setValue("autoPauseEnabled", autoPauseEnabled);
         Storage.setValue("swimPoolMode", swimPoolMode);
         Storage.setValue("poolLengthMeters", poolLengthMeters);
         Storage.setValue("autoLapDistanceMeters", autoLapDistanceMeters);

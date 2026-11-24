@@ -10,6 +10,7 @@ module MainSettingsMenu {
         menu.addItem(new WatchUi.MenuItem("Profil Multisport", SportDefinitions.getProfileName(s.profileId), :profile, null));
         menu.addItem(new WatchUi.ToggleMenuItem("Transitions", "Inclure T1 / T2", :transitions, s.transitionsEnabled, null));
         menu.addItem(new WatchUi.ToggleMenuItem("Changement auto", "Détection sport auto", :auto_sport, s.autoSportChange, null));
+        menu.addItem(new WatchUi.ToggleMenuItem("Pause auto", "Arrêt automatique", :auto_pause, s.autoPauseEnabled, null));
 
         var swimLabel = s.swimPoolMode ? ("Piscine " + s.poolLengthMeters.toString() + "m") : "Eau libre (GPS)";
         menu.addItem(new WatchUi.MenuItem("Natation", swimLabel, :swim_mode, null));
@@ -50,6 +51,11 @@ class MainSettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id == :auto_sport) {
             if (item instanceof WatchUi.ToggleMenuItem) {
                 s.autoSportChange = (item as WatchUi.ToggleMenuItem).isEnabled();
+                s.save();
+            }
+        } else if (id == :auto_pause) {
+            if (item instanceof WatchUi.ToggleMenuItem) {
+                s.autoPauseEnabled = (item as WatchUi.ToggleMenuItem).isEnabled();
                 s.save();
             }
         } else if (id == :swim_mode) {

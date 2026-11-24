@@ -74,7 +74,7 @@ class ActiveDataView extends WatchUi.View {
         GarminComponents.drawGarminOverlay(dc, manager);
     }
 
-    // SPECIAL NATIVE GARMIN TRANSITION SCREEN (Yellow theme + Cumulative & Previous recap)
+    // SPECIAL NATIVE GARMIN TRANSITION SCREEN (Yellow theme + dynamic alignment + glowing LAP hint!)
     private function drawTransitionScreen(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
@@ -82,11 +82,13 @@ class ActiveDataView extends WatchUi.View {
         var sport = seg.sportType;
         var transYellow = 0xFFCC00;
 
-        // Top yellow transition header + Material transition icon
-        SportIcons.drawSportIcon(dc, sport, cx - 78, 40, 14, transYellow);
-        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        // Top yellow transition header dynamically centered (ZERO icon overlap!)
         var tTitle = (sport == SportDefinitions.SPORT_TRANSITION_1) ? "TRANSITION 1" : "TRANSITION 2";
-        dc.drawText(cx + 12, 40, Graphics.FONT_XTINY, tTitle, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var tW = dc.getTextWidthInPixels(tTitle, Graphics.FONT_XTINY);
+        var tStartX = cx - ((32 + tW) / 2);
+        SportIcons.drawSportIcon(dc, sport, tStartX + 12, 40, 14, transYellow);
+        dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(tStartX + 30, 40, Graphics.FONT_XTINY, tTitle, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Large crisp transition chrono
         GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 88, Theme.COLOR_WHITE);
@@ -98,12 +100,12 @@ class ActiveDataView extends WatchUi.View {
         dc.setPenWidth(3);
         dc.drawLine(cx, 132, cx, 256);
 
-        var leftCx = cx / 2 + 6;
-        var rightCx = cx + (cx / 2) - 6;
+        var leftCx = (cx / 2) + 16;
+        var rightCx = cx + (cx / 2) - 16;
 
-        // Middle-Left: Cumulative Multisport Time since start
+        // Middle-Left: Cumulative Multisport Time since start (compact "TOTAL", zero clipping!)
         dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(leftCx, 156, Graphics.FONT_XTINY, "TPS TOTAL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(leftCx, 156, Graphics.FONT_XTINY, "TOTAL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(leftCx, 206, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -120,21 +122,27 @@ class ActiveDataView extends WatchUi.View {
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(rightCx, 206, Graphics.FONT_MEDIUM, prevVal, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Bottom: Next Sport preview + Material SVG Icon + Live HR
+        // Bottom: Next Sport preview dynamically centered (ZERO icon overlap!)
         var nextSp = manager.getNextSport();
         if (nextSp != null) {
             var nColor = SportDefinitions.getSportColor(nextSp as Number);
+            var nName = SportDefinitions.getSportName(nextSp as Number).toUpper();
+            var nW = dc.getTextWidthInPixels(nName, Graphics.FONT_SMALL);
+            var nStartX = cx - ((34 + nW) / 2);
             dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, 278, Graphics.FONT_XTINY, "SUIVANT", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            SportIcons.drawSportIcon(dc, nextSp as Number, cx - 54, 314, 14, nColor);
+            SportIcons.drawSportIcon(dc, nextSp as Number, nStartX + 12, 314, 14, nColor);
             dc.setColor(nColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx + 16, 314, Graphics.FONT_SMALL, SportDefinitions.getSportName(nextSp as Number).toUpper(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(nStartX + 32, 314, Graphics.FONT_SMALL, nName, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // Yellow bottom arc accent + live HR
+        // Live HR at bottom
         var hrStr = (manager.heartRate > 30) ? (manager.heartRate.toString() + " bpm") : "--";
         dc.setColor(transYellow, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, 354, Graphics.FONT_XTINY, hrStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Native Garmin Glowing Blue/Cyan Bottom-Right Arc (332 deg = BACK/LAP button hint!)
+        GarminComponents.drawActionGlowArc(dc, 332, 0xAAEEFF, 0x00CCFF, 0x004466);
     }
 
     // PAGE 0: Signature Forerunner 965 Main Screen (4 fields + Red T/Cross dividers + Bottom 5-zone HR arc)
@@ -612,9 +620,8 @@ class ActiveDataDelegate extends WatchUi.BehaviorDelegate {
         }
         var finished = manager.nextSegment();
         if (finished) {
-            var sumView = new SummaryView(manager);
-            var sumDel = new SummaryDelegate(manager, sumView);
-            WatchUi.switchToView(sumView, sumDel, WatchUi.SLIDE_LEFT);
+            var evalView = new FeelEvalView(manager);
+            WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
         } else {
             WatchUi.requestUpdate();
         }

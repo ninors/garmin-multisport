@@ -128,10 +128,8 @@ class PreStartView extends WatchUi.View {
         dc.drawLine(cx - 9, 356, cx, 365);
         dc.drawLine(cx, 365, cx + 9, 356);
 
-        // 11. Subtle Green START Bezel Accent on Top-Right (exact photo)
-        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(5);
-        dc.drawArc(cx, cy, cx - 4, Graphics.ARC_CLOCKWISE, 35, 17);
+        // 11. Native Garmin Glowing Cyan/Green START Bezel Arc on Top-Right
+        GarminComponents.drawActionGlowArc(dc, 28, 0xAAFFCC, Theme.COLOR_GREEN_RING, 0x004422);
 
         // Full-screen Garmin overlay if active (e.g. profile switch)
         GarminComponents.drawGarminOverlay(dc, manager);
@@ -167,9 +165,9 @@ class PreStartDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    // DOWN -> Quick cycle Multisport Profile (Triathlon / Duathlon / Swimrun / Perso)
+    // DOWN -> Quick cycle Multisport Profile (Triathlon / Duathlon / Swimrun / Aquathlon / Perso)
     function onNextPage() as Boolean {
-        manager.settings.profileId = (manager.settings.profileId + 1) % 4;
+        manager.settings.profileId = (manager.settings.profileId + 1) % 5;
         manager.settings.save();
         manager.rebuildProfile();
         WatchUi.requestUpdate();

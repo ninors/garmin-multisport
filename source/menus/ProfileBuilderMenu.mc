@@ -8,6 +8,7 @@ module ProfileBuilderMenu {
         menu.addItem(new WatchUi.MenuItem("Triathlon", "Nage • Vélo • Course", :triathlon, null));
         menu.addItem(new WatchUi.MenuItem("Duathlon", "Course • Vélo • Course", :duathlon, null));
         menu.addItem(new WatchUi.MenuItem("Swimrun", "Nage • Course • Nage • Course", :swimrun, null));
+        menu.addItem(new WatchUi.MenuItem("Aquathlon", "Nage • Course", :aquathlon, null));
         menu.addItem(new WatchUi.MenuItem("Multisport Perso", manager.settings.customSports.size().toString() + " sports", :custom, null));
         menu.addItem(new WatchUi.MenuItem("Éditer Perso...", "Ajouter / Retirer", :edit_custom, null));
 
@@ -39,6 +40,7 @@ module ProfileBuilderMenu {
         menu.addItem(new WatchUi.MenuItem("Trail", "Sentier", SportDefinitions.SPORT_TRAIL, null));
         menu.addItem(new WatchUi.MenuItem("Marche", "Randonnée / Marche", SportDefinitions.SPORT_WALK, null));
         menu.addItem(new WatchUi.MenuItem("Cardio", "Fitness / Renfo", SportDefinitions.SPORT_CARDIO, null));
+        menu.addItem(new WatchUi.MenuItem("Aviron", "Rameur / Kayak", SportDefinitions.SPORT_ROW, null));
 
         WatchUi.pushView(menu, new AddSportPickerDelegate(manager), WatchUi.SLIDE_LEFT);
     }
@@ -60,6 +62,8 @@ class ProfileSelectorDelegate extends WatchUi.Menu2InputDelegate {
             manager.settings.profileId = SportDefinitions.PROFILE_DUATHLON;
         } else if (id == :swimrun) {
             manager.settings.profileId = SportDefinitions.PROFILE_SWIMRUN;
+        } else if (id == :aquathlon) {
+            manager.settings.profileId = SportDefinitions.PROFILE_AQUATHLON;
         } else if (id == :custom) {
             manager.settings.profileId = SportDefinitions.PROFILE_CUSTOM;
         } else if (id == :edit_custom) {

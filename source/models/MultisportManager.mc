@@ -73,8 +73,14 @@ class MultisportManager {
     public var lastHrAlertTick as Number;
     public var lastPaceAlertTick as Number;
 
-    // Auto-sport heuristic counter
+    // Auto-sport & Auto-pause heuristic counters
     private var autoSportMatchTicks as Number;
+    public var autoPaused as Boolean;
+    private var autoPauseStopTicks as Number;
+    private var autoPauseMoveTicks as Number;
+
+    // Post-activity self-evaluation feel rating (0..4)
+    public var feelRating as Number;
 
     // Lock state (LIGHT button long/toggle)
     public var isLocked as Boolean;
@@ -147,6 +153,10 @@ class MultisportManager {
         lastHrAlertTick = -30;
         lastPaceAlertTick = -30;
         autoSportMatchTicks = 0;
+        autoPaused = false;
+        autoPauseStopTicks = 0;
+        autoPauseMoveTicks = 0;
+        feelRating = 3;
         isLocked = false;
 
         trackLats = [] as Array<Float>;
@@ -575,11 +585,65 @@ class MultisportManager {
                     startCurrentLegSession();
                 }
             }
-            updateActiveMetrics();
-            checkAlerts();
-            checkAutoSportChange();
+            checkAutoPause();
+            if (!autoPaused) {
+                updateActiveMetrics();
+                checkAlerts();
+                checkAutoSportChange();
+            }
         }
         WatchUi.requestUpdate();
+    }
+
+    // Smart hysteresis Auto-Pause (disabled during Swimming & Transitions)
+    private function checkAutoPause() as Void {
+        if (!settings.autoPauseEnabled) {
+            if (autoPaused) {
+                autoPaused = false;
+                if (session != null && !session.isRecording()) {
+                    session.start();
+                }
+            }
+            return;
+        }
+        var sp = getCurrentSport();
+        if (SportDefinitions.isSwim(sp) || SportDefinitions.isTransition(sp)) {
+            return;
+        }
+        if (!autoPaused) {
+            if (speedMps < 0.55f) {
+                autoPauseStopTicks++;
+                if (autoPauseStopTicks >= 4) {
+                    autoPaused = true;
+                    autoPauseStopTicks = 0;
+                    autoPauseMoveTicks = 0;
+                    pauseStartMs = System.getTimer();
+                    if (session != null && session.isRecording()) {
+                        session.stop();
+                    }
+                    triggerFeedback(Attention.TONE_STOP, 60);
+                    showOverlay(OVERLAY_PAUSE, 0xFF1133, sp, "", "", 2);
+                }
+            } else {
+                autoPauseStopTicks = 0;
+            }
+        } else {
+            if (speedMps >= 1.1f) {
+                autoPauseMoveTicks++;
+                if (autoPauseMoveTicks >= 2) {
+                    autoPaused = false;
+                    autoPauseMoveTicks = 0;
+                    accumulatedPauseMs += (System.getTimer() - pauseStartMs);
+                    if (session != null && !session.isRecording()) {
+                        session.start();
+                    }
+                    triggerFeedback(Attention.TONE_START, 60);
+                    showOverlay(OVERLAY_START, 0x00E64D, sp, "", "", 2);
+                }
+            } else {
+                autoPauseMoveTicks = 0;
+            }
+        }
     }
 
     private function updateActiveMetrics() as Void {
@@ -747,21 +811,32 @@ class MultisportManager {
         if (nextSport == null) {
             return;
         }
-        // Heuristic: from Transition -> Bike when speed > 16 km/h (4.4 m/s) for 8s
-        // From Transition -> Run when cadence > 140 spm and speed > 2.0 m/s for 8s
+        var curSeg = getCurrentSegment();
         var matched = false;
-        if (SportDefinitions.isTransition(curSport) && SportDefinitions.isBike(nextSport as Number)) {
-            if (speedMps > 4.4f) {
+        // 1. Swim -> T1: running cadence detected after swimming >= 100m
+        if (SportDefinitions.isSwim(curSport) && SportDefinitions.isTransition(nextSport as Number)) {
+            if (curSeg.distanceMeters >= 100.0f && cadence >= 110 && speedMps > 1.5f) {
                 matched = true;
             }
+        // 2. T1 -> Bike: cycling speed > 15 km/h (4.2 m/s)
+        } else if (SportDefinitions.isTransition(curSport) && SportDefinitions.isBike(nextSport as Number)) {
+            if (speedMps > 4.2f) {
+                matched = true;
+            }
+        // 3. Bike -> T2: dismount (speed < 1.8 m/s & zero bike cadence after >= 200m)
+        } else if (SportDefinitions.isBike(curSport) && SportDefinitions.isTransition(nextSport as Number)) {
+            if (curSeg.distanceMeters >= 200.0f && speedMps < 1.8f && cadence == 0) {
+                matched = true;
+            }
+        // 4. T2 -> Run/Trail: running cadence >= 135 spm & speed 6-20 km/h
         } else if (SportDefinitions.isTransition(curSport) && (nextSport == SportDefinitions.SPORT_RUN || nextSport == SportDefinitions.SPORT_TRAIL)) {
-            if (cadence >= 140 && speedMps > 2.0f && speedMps < 5.5f) {
+            if (cadence >= 135 && speedMps > 1.8f && speedMps < 5.8f) {
                 matched = true;
             }
         }
         if (matched) {
             autoSportMatchTicks++;
-            if (autoSportMatchTicks >= 8) {
+            if (autoSportMatchTicks >= 6) {
                 autoSportMatchTicks = 0;
                 nextSegment();
             }

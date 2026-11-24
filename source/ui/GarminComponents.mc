@@ -406,6 +406,25 @@ module GarminComponents {
         }
     }
 
+    // Native Garmin Glowing Curved Action Arc (e.g. Top-Right START 28 deg, Bottom-Right LAP 332 deg)
+    function drawActionGlowArc(dc as Dc, centerDeg as Number, coreColor as Number, midColor as Number, dimColor as Number) as Void {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        var r = cx - 6;
+
+        dc.setPenWidth(8);
+        dc.setColor(dimColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 13, centerDeg + 13);
+
+        dc.setPenWidth(6);
+        dc.setColor(midColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 9, centerDeg + 9);
+
+        dc.setPenWidth(4);
+        dc.setColor(coreColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 5, centerDeg + 5);
+    }
+
     // Paused Red Ring Indicator
     function drawPausedOverlay(dc as Dc) as Void {
         var cx = dc.getWidth() / 2;

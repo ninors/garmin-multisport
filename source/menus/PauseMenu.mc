@@ -37,16 +37,14 @@ class PauseMenuDelegate extends WatchUi.Menu2InputDelegate {
             var finished = manager.nextSegment();
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             if (finished) {
-                var sumView = new SummaryView(manager);
-                var sumDel = new SummaryDelegate(manager, sumView);
-                WatchUi.switchToView(sumView, sumDel, WatchUi.SLIDE_LEFT);
+                var evalView = new FeelEvalView(manager);
+                WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
             }
         } else if (id == :save) {
             manager.saveAndFinish();
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            var sumView = new SummaryView(manager);
-            var sumDel = new SummaryDelegate(manager, sumView);
-            WatchUi.switchToView(sumView, sumDel, WatchUi.SLIDE_LEFT);
+            var evalView = new FeelEvalView(manager);
+            WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
         } else if (id == :lap) {
             if (manager.state == MultisportManager.STATE_PAUSED) {
                 manager.togglePause();
