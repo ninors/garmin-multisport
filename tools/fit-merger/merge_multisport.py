@@ -163,6 +163,8 @@ def try_split_continuous_fit(fit_path: Path, output_path: Path) -> bool:
 
         sess = SessionMessage()
         sess.message_index = sess_idx
+        sess.event = Event.SESSION
+        sess.event_type = EventType.STOP
         sess.timestamp = leg_end
         sess.start_time = leg_start
         sess.total_elapsed_time = leg_timer
@@ -182,9 +184,11 @@ def try_split_continuous_fit(fit_path: Path, output_path: Path) -> bool:
     act = ActivityMessage()
     if last_ts is not None:
         act.timestamp = last_ts
+    act.event = Event.ACTIVITY
+    act.event_type = EventType.STOP
     act.total_timer_time = total_timer
     act.num_sessions = len(grouped_legs)
-    act.type = Activity.AUTO_MULTI_SPORT
+    act.type = Activity.MANUAL
     builder.add(act)
 
     builder.build().to_file(str(output_path))
@@ -299,9 +303,11 @@ def merge_fit_files(fit_paths: List[Path], leg_categories: List[str], output_pat
     act = ActivityMessage()
     if last_timestamp is not None:
         act.timestamp = last_timestamp
+    act.event = Event.ACTIVITY
+    act.event_type = EventType.STOP
     act.total_timer_time = total_timer_time
     act.num_sessions = session_index
-    act.type = Activity.AUTO_MULTI_SPORT
+    act.type = Activity.MANUAL
     builder.add(act)
 
     merged_fit = builder.build()
@@ -372,6 +378,8 @@ def build_synthetic_test_triathlon(output_path: Path) -> None:
 
         lap = LapMessage()
         lap.message_index = idx
+        lap.event = Event.LAP
+        lap.event_type = EventType.STOP
         lap.timestamp = leg_end_ms
         lap.start_time = leg_start_ms
         lap.total_elapsed_time = float(dur_sec)
@@ -385,6 +393,8 @@ def build_synthetic_test_triathlon(output_path: Path) -> None:
 
         sess = SessionMessage()
         sess.message_index = idx
+        sess.event = Event.SESSION
+        sess.event_type = EventType.STOP
         sess.timestamp = leg_end_ms
         sess.start_time = leg_start_ms
         sess.total_elapsed_time = float(dur_sec)
@@ -403,9 +413,11 @@ def build_synthetic_test_triathlon(output_path: Path) -> None:
 
     act = ActivityMessage()
     act.timestamp = cur_ms
+    act.event = Event.ACTIVITY
+    act.event_type = EventType.STOP
     act.total_timer_time = float(sum(x[2] for x in legs_spec))
     act.num_sessions = len(legs_spec)
-    act.type = Activity.AUTO_MULTI_SPORT
+    act.type = Activity.MANUAL
     builder.add(act)
 
     fit = builder.build()
@@ -492,7 +504,7 @@ def main() -> int:
     work_dir = Path("tmp_fits")
     work_dir.mkdir(exist_ok=True)
 
-    # Optional test mode: upload a synthetic 5-leg Triathlon FIT to verify Garmin Connect parsing
+    # Optional test mode: upload a synthetic 5-leg Triathlon FIT and VERIFY it appears on Garmin Connect
     if test_upload:
         test_fit = work_dir / "test_triathlon_multisport.fit"
         print("Building synthetic 5-leg Test Triathlon FIT (Swim -> T1 -> Bike -> T2 -> Run)...")
@@ -500,6 +512,12 @@ def main() -> int:
         print(f"Uploading {test_fit} ({test_fit.stat().st_size} bytes) to Garmin Connect...")
         resp = client.upload_activity(str(test_fit))
         print(f"Test upload response: {resp}")
+        time.sleep(6)
+        check_acts = client.get_activities(0, 5)
+        print("Verification — top 5 activities AFTER test upload:")
+        for ca in check_acts:
+            ckey = (ca.get("activityType") or {}).get("typeKey", "?")
+            print(f"  * [{ca.get('activityId')}] {ca.get('startTimeGMT')} | {ckey} | {ca.get('duration', 0):.0f}s | {ca.get('activityName')}")
 
     # Inspect recent activities and merge any consecutive multisport chains (NEVER deleting originals!)
     activities = client.get_activities(0, 30)
