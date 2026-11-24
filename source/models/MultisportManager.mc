@@ -491,14 +491,13 @@ class MultisportManager {
         lastSessionDist = 0.0f;
 
         var sessionName = "MS " + msGroupId + " " + SportDefinitions.getProfileName(settings.profileId);
+        // Record the single continuous session as SPORT_RUNNING (100% supported on fr165m with full GPS/HR/LiveTrack;
+        // Garmin firmware rejects SPORT_MULTISPORT on fr165m, and our GitHub script splits laps via ms_sport into native multi_sport).
         var opts = {
             :name => sessionName,
-            :sport => SportDefinitions.getFitSport(sport),
-            :subSport => SportDefinitions.getFitSubSport(sport)
+            :sport => Activity.SPORT_RUNNING,
+            :subSport => Activity.SUB_SPORT_GENERIC
         };
-        if (sport == SportDefinitions.SPORT_SWIM_POOL) {
-            opts[:poolLength] = settings.poolLengthMeters.toFloat();
-        }
 
         try {
             session = ActivityRecording.createSession(opts);
