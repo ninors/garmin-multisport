@@ -58,10 +58,8 @@ class ActiveDataView extends WatchUi.View {
             GarminComponents.drawPausedOverlay(dc);
         }
 
-        // Active alert overlay
-        if (manager.alertMessage != null) {
-            GarminComponents.drawAlertBanner(dc, manager.alertMessage as String, manager.alertSubMessage);
-        }
+        // Native Garmin Full-Screen Action Overlays (Big Green Triangle, Red Square, Transitions, Laps)
+        GarminComponents.drawGarminOverlay(dc, manager);
     }
 
     // PAGE 0: Signature Forerunner 965 Main Screen (4 fields + Red T/Cross dividers + Bottom 5-zone HR arc)

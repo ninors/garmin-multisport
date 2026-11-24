@@ -27,7 +27,7 @@ from fit_tool.profile.messages.record_message import RecordMessage
 from fit_tool.profile.messages.session_message import SessionMessage
 from garminconnect import Garmin
 
-TAG_REGEX = re.compile(r"^\[MS:(\d{6}_\d{4})\s+(\d+)/(\d+)\]\s*(.+)$")
+TAG_REGEX = re.compile(r"^(?:\[MS:|MS\s+)(\d{6}_\d{4})\s+(\d+)[/-](\d+)\]?\s*(.+)$")
 MERGED_PREFIX = "Multisport"
 
 

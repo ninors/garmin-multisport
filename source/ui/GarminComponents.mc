@@ -258,27 +258,96 @@ module GarminComponents {
         dc.drawText(cx + 56, yCenter, Theme.fLabel as Graphics.FontType, battPct.toString() + "%", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // High-contrast FR965 Alert Banner Overlay
-    function drawAlertBanner(dc as Dc, title as String, subtitle as String?) as Void {
-        Theme.ensureFonts();
+    // Exact 3 horizontal overlapping Garmin Multisport rings (Red, Blue, Green)
+    function drawMultisportRings(dc as Dc, cx as Number, cy as Number, r as Number) as Void {
+        var offset = (r * 1.2f).toNumber();
+        dc.setPenWidth(5);
+        dc.setColor(0xFF2B2B, Graphics.COLOR_TRANSPARENT);
+        dc.drawCircle(cx - offset, cy, r);
+        dc.setColor(0x0066B3, Graphics.COLOR_TRANSPARENT);
+        dc.drawCircle(cx, cy, r);
+        dc.setColor(0x22CC33, Graphics.COLOR_TRANSPARENT);
+        dc.drawCircle(cx + offset, cy, r);
+    }
+
+    // Authentic Full-Screen Garmin Forerunner Action Overlays (NO clunky boxes!)
+    function drawGarminOverlay(dc as Dc, manager as MultisportManager) as Void {
+        var oType = manager.overlayType;
+        if (oType == MultisportManager.OVERLAY_NONE) {
+            return;
+        }
         var w = dc.getWidth();
+        var h = dc.getHeight();
         var cx = w / 2;
-        var boxW = 310;
-        var boxH = 82;
-        var x = cx - (boxW / 2);
-        var y = (dc.getHeight() / 2) - (boxH / 2);
+        var cy = h / 2;
 
-        dc.setColor(Theme.COLOR_BANNER_BG, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(x, y, boxW, boxH, 16);
-        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
-        dc.drawRoundedRectangle(x, y, boxW, boxH, 16);
-
-        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, y + 28, Theme.fMedium as Graphics.FontType, title, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        if (subtitle != null) {
+        if (oType == MultisportManager.OVERLAY_START) {
+            // Full-screen black backdrop + thick green bezel ring + HUGE green Play Triangle
+            dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+            dc.fillCircle(cx, cy, cx);
             dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, y + 58, Theme.fSmall as Graphics.FontType, subtitle, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setPenWidth(12);
+            dc.drawCircle(cx, cy, cx - 6);
+            var tri = [
+                [cx - 38, cy - 52],
+                [cx + 56, cy],
+                [cx - 38, cy + 52]
+            ] as Array<[Numeric, Numeric]>;
+            dc.fillPolygon(tri);
+        } else if (oType == MultisportManager.OVERLAY_PAUSE) {
+            // Full-screen black backdrop + thick red bezel ring + HUGE red Stop Square
+            dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+            dc.fillCircle(cx, cy, cx);
+            dc.setColor(Theme.COLOR_GPS_RED, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(12);
+            dc.drawCircle(cx, cy, cx - 6);
+            dc.fillRoundedRectangle(cx - 44, cy - 44, 88, 88, 10);
+        } else if (oType == MultisportManager.OVERLAY_TRANSITION) {
+            // Native Garmin Multisport Transition Full-Screen Flash
+            dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+            dc.fillCircle(cx, cy, cx);
+            dc.setColor(manager.overlayColor, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(10);
+            dc.drawCircle(cx, cy, cx - 6);
+            SportIcons.drawSportIcon(dc, manager.overlaySport, cx, cy - 54, 28, manager.overlayColor);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            if (manager.alertMessage != null) {
+                dc.drawText(cx, cy + 16, Graphics.FONT_LARGE, manager.alertMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+            if (manager.alertSubMessage != null) {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy + 68, Graphics.FONT_MEDIUM, manager.alertSubMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+        } else if (oType == MultisportManager.OVERLAY_LAP) {
+            // Native Garmin Lap Screen
+            dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+            dc.fillCircle(cx, cy, cx);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(8);
+            dc.drawCircle(cx, cy, cx - 5);
+            if (manager.alertMessage != null) {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy - 42, Graphics.FONT_MEDIUM, manager.alertMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+            if (manager.alertSubMessage != null) {
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy + 20, Graphics.FONT_NUMBER_HOT, manager.alertSubMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+        } else {
+            // Clean Circular Garmin Alert (Nutrition / HR / Profile switch)
+            dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+            dc.fillCircle(cx, cy, cx);
+            dc.setColor(manager.overlayColor, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(8);
+            dc.drawCircle(cx, cy, cx - 5);
+            if (manager.alertMessage != null) {
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy - 16, Graphics.FONT_MEDIUM, manager.alertMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+            if (manager.alertSubMessage != null) {
+                dc.setColor(manager.overlayColor, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy + 32, Graphics.FONT_SMALL, manager.alertSubMessage as String, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
     }
 
@@ -287,7 +356,7 @@ module GarminComponents {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(5);
+        dc.setPenWidth(6);
         dc.drawCircle(cx, cy, cx - 3);
     }
 }

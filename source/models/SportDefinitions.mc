@@ -95,7 +95,9 @@ module SportDefinitions {
                 return Activity.SPORT_SWIMMING;
             case SPORT_TRANSITION_1:
             case SPORT_TRANSITION_2:
-                return Activity.SPORT_TRANSITION;
+                // fr165m rejects SPORT_TRANSITION in ActivityRecording.createSession;
+                // record as SPORT_GENERIC tagged [MS:... T1/T2] for the FIT merger.
+                return Activity.SPORT_GENERIC;
             case SPORT_BIKE:
                 return Activity.SPORT_CYCLING;
             case SPORT_RUN:
@@ -117,9 +119,8 @@ module SportDefinitions {
             case SPORT_SWIM_POOL:
                 return Activity.SUB_SPORT_LAP_SWIMMING;
             case SPORT_TRANSITION_1:
-                return Activity.SUB_SPORT_SWIM_TO_BIKE_TRANSITION;
             case SPORT_TRANSITION_2:
-                return Activity.SUB_SPORT_BIKE_TO_RUN_TRANSITION;
+                return Activity.SUB_SPORT_GENERIC;
             case SPORT_BIKE:
                 return Activity.SUB_SPORT_ROAD;
             case SPORT_RUN:

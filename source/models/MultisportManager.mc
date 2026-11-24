@@ -51,7 +51,18 @@ class MultisportManager {
     public var hrZones as Array<Number>; // 6 bounds: [z1min, z1max, z2max, z3max, z4max, z5max]
     public var zoneSeconds as Array<Number>; // 5 buckets
 
-    // Alert banner overlay
+    // Native Garmin full-screen overlay types (no ugly rectangle popups!)
+    public static const OVERLAY_NONE = 0;
+    public static const OVERLAY_START = 1;       // Big green triangle + green bezel ring
+    public static const OVERLAY_PAUSE = 2;       // Big red square + red bezel ring
+    public static const OVERLAY_TRANSITION = 3;  // Big sport icon + colored ring + split
+    public static const OVERLAY_LAP = 4;         // Native Garmin lap banner
+    public static const OVERLAY_ALERT = 5;       // Clean Garmin alert (GPS / HR / Nutrition)
+
+    // Overlay state
+    public var overlayType as Number;
+    public var overlayColor as Number;
+    public var overlaySport as Number;
     public var alertMessage as String?;
     public var alertSubMessage as String?;
     public var alertExpiresTick as Number;
@@ -78,6 +89,7 @@ class MultisportManager {
 
     // Active FIT recording session
     private var session as ActivityRecording.Session?;
+    private var pendingSessionDelay as Number;
     private var timer as Timer.Timer;
     private var segmentStartMs as Number;
     private var pauseStartMs as Number;
@@ -113,6 +125,9 @@ class MultisportManager {
         globalHrSamples = 0;
         zoneSeconds = [0, 0, 0, 0, 0] as Array<Number>;
 
+        overlayType = OVERLAY_NONE;
+        overlayColor = 0x00E64D;
+        overlaySport = SportDefinitions.SPORT_SWIM_OPEN;
         alertMessage = null;
         alertSubMessage = null;
         alertExpiresTick = 0;
@@ -132,6 +147,7 @@ class MultisportManager {
         hasLastTrack = false;
 
         session = null;
+        pendingSessionDelay = 0;
         segmentStartMs = 0;
         pauseStartMs = 0;
         accumulatedPauseMs = 0;
@@ -280,7 +296,7 @@ class MultisportManager {
         state = STATE_ACTIVE;
         startCurrentLegSession();
         triggerFeedback(Attention.TONE_START, 100);
-        showAlert("DÉPART !", SportDefinitions.getSportName(getCurrentSport()), 3);
+        showOverlay(OVERLAY_START, 0x00E64D, getCurrentSport(), "", "", 2);
     }
 
     // Move to the next leg/transition (BACK/LAP button)
@@ -293,26 +309,35 @@ class MultisportManager {
         finalizeCurrentLegSession(true);
         var curSeg = getCurrentSegment();
         curSeg.completed = true;
+        var prevTime = SportDefinitions.formatTime(curSeg.elapsedMs);
 
         if (currentLegIndex + 1 >= legs.size()) {
             // Completed final leg -> Summary
             state = STATE_SUMMARY;
             triggerFeedback(Attention.TONE_SUCCESS, 150);
-            showAlert("TERMINÉ !", SportDefinitions.formatTime(totalElapsedMs), 4);
+            overlayType = OVERLAY_NONE;
             return true;
         }
 
         currentLegIndex++;
         state = STATE_ACTIVE;
         autoSportMatchTicks = 0;
-        startCurrentLegSession();
+        // Reset leg timer immediately; defer ActivityRecording.createSession to next 1Hz tick
+        // because Garmin's session.save() flushes asynchronously!
+        segmentStartMs = System.getTimer();
+        accumulatedPauseMs = 0;
+        lapStartElapsedMs = 0;
+        lapStartDistMeters = 0.0f;
+        lastAutoLapDistMeters = 0.0f;
+        lastSessionDist = 0.0f;
+        pendingSessionDelay = 2; // Wait 2s for async FIT flush before opening next session
         triggerFeedback(Attention.TONE_LAP, 120);
 
         var nextSport = getCurrentSport();
         var title = SportDefinitions.isTransition(nextSport)
-            ? ("TRANSITION " + SportDefinitions.getSportShortName(nextSport))
+            ? SportDefinitions.getSportShortName(nextSport)
             : SportDefinitions.getSportName(nextSport);
-        showAlert(title, "Étape " + (currentLegIndex + 1).toString() + "/" + legs.size().toString(), 3);
+        showOverlay(OVERLAY_TRANSITION, SportDefinitions.getSportColor(nextSport), nextSport, title, prevTime, 3);
         return false;
     }
 
@@ -324,6 +349,7 @@ class MultisportManager {
                 session.stop();
             }
             triggerFeedback(Attention.TONE_STOP, 80);
+            showOverlay(OVERLAY_PAUSE, 0xFF1133, getCurrentSport(), "", "", 2);
         } else if (state == STATE_PAUSED) {
             state = STATE_ACTIVE;
             accumulatedPauseMs += (System.getTimer() - pauseStartMs);
@@ -331,6 +357,7 @@ class MultisportManager {
                 session.start();
             }
             triggerFeedback(Attention.TONE_START, 80);
+            showOverlay(OVERLAY_START, 0x00E64D, getCurrentSport(), "", "", 2);
         }
     }
 
@@ -342,11 +369,12 @@ class MultisportManager {
         if (session != null && session.isRecording()) {
             session.addLap();
         }
+        var lapMs = seg.elapsedMs - lapStartElapsedMs;
         seg.lapCount++;
         lapStartElapsedMs = seg.elapsedMs;
         lapStartDistMeters = seg.distanceMeters;
         triggerFeedback(Attention.TONE_LAP, 75);
-        showAlert("TOUR " + seg.lapCount.toString(), SportDefinitions.formatTime(seg.elapsedMs), 3);
+        showOverlay(OVERLAY_LAP, 0xFFFFFF, seg.sportType, "TOUR " + seg.lapCount.toString(), SportDefinitions.formatTime(lapMs), 3);
     }
 
     public function saveAndFinish() as Void {
@@ -385,18 +413,17 @@ class MultisportManager {
         lastAutoLapDistMeters = 0.0f;
         lastSessionDist = 0.0f;
 
-        // Tag session name with [MS:<groupId> <idx>/<total>] so the GitHub auto-merger
-        // can reliably identify and combine all legs into a single native Multisport FIT
-        var sessionName = "[MS:" + msGroupId + " " +
-            (currentLegIndex + 1).toString() + "/" + legs.size().toString() + "] " +
-            SportDefinitions.getSportName(sport);
+        // Compact ASCII tag [MS:YYMMDD_HHMM 1-5] Sport (safe length for FIT header)
+        var sessionName = "MS " + msGroupId + " " +
+            (currentLegIndex + 1).toString() + "-" + legs.size().toString() + " " +
+            SportDefinitions.getSportShortName(sport);
 
         var opts = {
             :name => sessionName,
             :sport => SportDefinitions.getFitSport(sport),
             :subSport => SportDefinitions.getFitSubSport(sport)
         };
-        if (sport == SportDefinitions.SPORT_SWIM_POOL && ActivityRecording has :createSession) {
+        if (sport == SportDefinitions.SPORT_SWIM_POOL) {
             opts[:poolLength] = settings.poolLengthMeters.toFloat();
         }
 
@@ -405,12 +432,14 @@ class MultisportManager {
             if (session != null) {
                 session.start();
             }
+            pendingSessionDelay = 0;
         } catch (ex) {
             session = null;
         }
     }
 
     private function finalizeCurrentLegSession(saveFile as Boolean) as Void {
+        pendingSessionDelay = 0;
         if (session != null) {
             try {
                 if (session.isRecording()) {
@@ -428,21 +457,21 @@ class MultisportManager {
         }
     }
 
-    // Sensor callback
+    // Sensor callback (guarded with `has` checks for fr165m safety!)
     public function onSensor(sensorInfo as Sensor.Info) as Void {
-        if (sensorInfo.heartRate != null) {
+        if (sensorInfo has :heartRate && sensorInfo.heartRate != null) {
             heartRate = sensorInfo.heartRate as Number;
         }
-        if (sensorInfo.cadence != null) {
+        if (sensorInfo has :cadence && sensorInfo.cadence != null) {
             cadence = sensorInfo.cadence as Number;
         }
-        if (sensorInfo.power != null) {
+        if (sensorInfo has :power && sensorInfo.power != null) {
             power = sensorInfo.power as Number;
         }
-        if (sensorInfo.speed != null) {
+        if (sensorInfo has :speed && sensorInfo.speed != null) {
             speedMps = sensorInfo.speed as Float;
         }
-        if (sensorInfo.altitude != null) {
+        if (sensorInfo has :altitude && sensorInfo.altitude != null) {
             altitude = sensorInfo.altitude as Float;
         }
     }
@@ -450,24 +479,23 @@ class MultisportManager {
     // GPS Position callback
     public function onPosition(info as Position.Info) as Void {
         var prevQuality = gpsQuality;
-        if (info.accuracy != null) {
+        if (info has :accuracy && info.accuracy != null) {
             gpsQuality = info.accuracy as Number;
         }
-        // Native Garmin GPS-lock beep & banner on Pre-Start screen
+        // Native Garmin GPS-lock beep on Pre-Start screen
         if (state == STATE_PRE_START && prevQuality < Position.QUALITY_GOOD && gpsQuality >= Position.QUALITY_GOOD) {
             triggerFeedback(Attention.TONE_KEY, 80);
-            showAlert("GPS PRÊT", "Appuyez sur START", 3);
         }
-        if (info.speed != null && (info.speed as Float) >= 0.0f) {
+        if (info has :speed && info.speed != null && (info.speed as Float) >= 0.0f) {
             speedMps = info.speed as Float;
         }
-        if (info.altitude != null) {
+        if (info has :altitude && info.altitude != null) {
             altitude = info.altitude as Float;
         }
-        if (info.heading != null) {
+        if (info has :heading && info.heading != null) {
             heading = info.heading as Float;
         }
-        if (info.position != null && gpsQuality >= Position.QUALITY_POOR) {
+        if (info has :position && info.position != null && gpsQuality >= Position.QUALITY_POOR) {
             hasPosition = true;
             var deg = (info.position as Position.Location).toDegrees();
             var lat = deg[0] as Double;
@@ -509,12 +537,19 @@ class MultisportManager {
     // 1 Hz main heartbeat
     public function onTick() as Void {
         tickCount++;
-        if (alertMessage != null && tickCount >= alertExpiresTick) {
+        if (overlayType != OVERLAY_NONE && tickCount >= alertExpiresTick) {
+            overlayType = OVERLAY_NONE;
             alertMessage = null;
             alertSubMessage = null;
         }
 
         if (state == STATE_ACTIVE) {
+            if (pendingSessionDelay > 0 && session == null) {
+                pendingSessionDelay--;
+                if (pendingSessionDelay == 0) {
+                    startCurrentLegSession();
+                }
+            }
             updateActiveMetrics();
             checkAlerts();
             checkAutoSportChange();
@@ -527,14 +562,14 @@ class MultisportManager {
         var actInfo = Activity.getActivityInfo();
 
         // Elapsed time for segment
-        if (actInfo != null && actInfo.timerTime != null && (actInfo.timerTime as Number) > 0) {
+        if (actInfo != null && actInfo has :timerTime && actInfo.timerTime != null && (actInfo.timerTime as Number) > 0) {
             seg.elapsedMs = actInfo.timerTime as Number;
         } else {
             seg.elapsedMs = System.getTimer() - segmentStartMs - accumulatedPauseMs;
         }
 
         // Distance for segment
-        if (actInfo != null && actInfo.elapsedDistance != null) {
+        if (actInfo != null && actInfo has :elapsedDistance && actInfo.elapsedDistance != null) {
             var d = actInfo.elapsedDistance as Float;
             if (d >= lastSessionDist) {
                 seg.distanceMeters = d;
@@ -544,21 +579,21 @@ class MultisportManager {
             seg.distanceMeters += speedMps;
         }
 
-        // HR / Cadence / Power fallback from ActivityInfo
+        // HR / Cadence / Power fallback from ActivityInfo (all safely guarded with `has`)
         if (actInfo != null) {
-            if (actInfo.currentHeartRate != null) {
+            if (actInfo has :currentHeartRate && actInfo.currentHeartRate != null) {
                 heartRate = actInfo.currentHeartRate as Number;
             }
-            if (actInfo.currentSpeed != null && (actInfo.currentSpeed as Float) >= 0.0f) {
+            if (actInfo has :currentSpeed && actInfo.currentSpeed != null && (actInfo.currentSpeed as Float) >= 0.0f) {
                 speedMps = actInfo.currentSpeed as Float;
             }
-            if (actInfo.currentCadence != null) {
+            if (actInfo has :currentCadence && actInfo.currentCadence != null) {
                 cadence = actInfo.currentCadence as Number;
             }
-            if (actInfo.currentPower != null) {
+            if (actInfo has :currentPower && actInfo.currentPower != null) {
                 power = actInfo.currentPower as Number;
             }
-            if (actInfo.calories != null) {
+            if (actInfo has :calories && actInfo.calories != null) {
                 seg.calories = actInfo.calories as Number;
             }
         }
@@ -688,10 +723,17 @@ class MultisportManager {
         }
     }
 
-    public function showAlert(title as String, subtitle as String, durationSec as Number) as Void {
+    public function showOverlay(oType as Number, color as Number, sport as Number, title as String, subtitle as String, durationSec as Number) as Void {
+        overlayType = oType;
+        overlayColor = color;
+        overlaySport = sport;
         alertMessage = title;
         alertSubMessage = subtitle;
         alertExpiresTick = tickCount + durationSec;
+    }
+
+    public function showAlert(title as String, subtitle as String, durationSec as Number) as Void {
+        showOverlay(OVERLAY_ALERT, 0x00E64D, getCurrentSport(), title, subtitle, durationSec);
     }
 
     public function triggerFeedback(tone as Attention.Tone, vibeMs as Number) as Void {

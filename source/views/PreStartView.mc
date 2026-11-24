@@ -1,6 +1,7 @@
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Position;
+import Toybox.System;
 import Toybox.WatchUi;
 
 class PreStartView extends WatchUi.View {
@@ -13,105 +14,129 @@ class PreStartView extends WatchUi.View {
 
     function onUpdate(dc as Dc) as Void {
         Theme.enableAA(dc);
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var cx = w / 2;
+        var cy = h / 2;
+
+        // 1. Pure black top half + deep Garmin dark-navy bottom half (matching native FR965 photo)
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var w = dc.getWidth();
-        var cx = w / 2;
-        var cy = dc.getHeight() / 2;
-        var curSport = manager.getCurrentSport();
-        var nextSport = manager.getNextSport();
-        var sportColor = SportDefinitions.getSportColor(curSport);
+        var splitY = 224;
+        // Subtle stylized dark background lines in top half
+        dc.setColor(0x141414, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(40, 146, w - 40, 146);
+        dc.drawLine(30, 162, w - 30, 162);
+        dc.drawLine(25, 190, w - 25, 190);
 
-        // 1. Native Garmin GPS Acquisition Arc at the very top edge
+        // Deep dark-navy tint for bottom half (like native FR965 pre-start screen)
+        dc.setColor(0x0A1622, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(0, splitY, w, h - splitY);
+
+        // 2. Top-center: Exact 3 overlapping Garmin Multisport rings (Red, Blue, Green)
+        GarminComponents.drawMultisportRings(dc, cx, 58, 16);
+
+        // 3. Bold White Activity Title ("Triathlon" / "Duathlon" / "Swimrun" / "Multisport")
+        var profileName = SportDefinitions.getProfileName(manager.settings.profileId);
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 114, Graphics.FONT_MEDIUM, profileName, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // 4. Native Garmin GPS Status Text + Horizontal Progress Bar
         var gpsReady = (manager.gpsQuality >= Position.QUALITY_GOOD);
         var gpsUsable = (manager.gpsQuality >= Position.QUALITY_POOR);
         var gpsColor = gpsReady ? Theme.COLOR_GPS_GREEN : (gpsUsable ? Theme.COLOR_GPS_YELLOW : Theme.COLOR_GPS_RED);
+        var gpsText = gpsReady ? "GPS prêt" : "Attente du signal GPS";
 
-        // Background track for GPS arc
-        dc.setPenWidth(8);
-        dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, 42);
+        dc.setColor(gpsReady ? Theme.COLOR_GPS_GREEN : Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 152, Graphics.FONT_XTINY, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Animated progress when searching GPS, full green arc when locked
+        // Horizontal GPS progress bar (exact FR965 style from photo)
+        var barX = 56;
+        var barW = w - 112;
+        var barY = 172;
+        dc.setColor(0x444444, Graphics.COLOR_TRANSPARENT);
+        dc.fillRoundedRectangle(barX, barY, barW, 5, 2);
+
         dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
         if (gpsReady) {
-            dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, 42);
+            dc.fillRoundedRectangle(barX, barY, barW, 5, 2);
         } else {
-            var pulseStep = (manager.tickCount % 4) + 1; // 1..4
-            var endDeg = 138 - (pulseStep * 22);
-            if (endDeg < 42) { endDeg = 42; }
-            dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, endDeg);
+            var frac = ((manager.tickCount % 5) + 1).toFloat() / 5.0f;
+            var fillW = (barW.toFloat() * frac * 0.45f).toNumber();
+            if (gpsUsable) {
+                fillW = (barW * 2) / 3;
+            }
+            if (fillW < 24) { fillW = 24; }
+            dc.fillRoundedRectangle(barX, barY, fillW, 5, 2);
         }
 
-        // GPS Status Pill + Live HR right underneath
-        var gpsText = gpsReady ? "GPS PRÊT" : (gpsUsable ? "GPS FAIBLE" : "ATTENTE GPS...");
-        dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 38, Theme.fLabel, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // 5. Sensor & Sport Icons Row (Heart + GPS + Compact Sport Chain)
+        var hrColor = (manager.heartRate > 30) ? Theme.COLOR_HEART_RED : Theme.COLOR_WHITE;
+        SportIcons.drawHeart(dc, 76, 200, 14, hrColor);
+        if (manager.heartRate > 30) {
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(94, 200, Graphics.FONT_XTINY, manager.heartRate.toString(), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
 
-        // Live Heart Rate badge (heart + BPM)
-        var hrText = (manager.heartRate > 30) ? manager.heartRate.toString() : "--";
-        SportIcons.drawHeart(dc, cx - 28, 66, 12, Theme.COLOR_HEART_RED);
+        // Compact sport chain on the right side of the sensor row
+        var legCount = manager.legs.size();
+        var shown = 0;
+        var iconX = 210;
+        for (var i = 0; i < legCount && shown < 4; i++) {
+            var sp = manager.legs[i];
+            if (!SportDefinitions.isTransition(sp)) {
+                var c = (shown == 0) ? SportDefinitions.getSportColor(sp) : Theme.COLOR_LABEL;
+                SportIcons.drawSportIcon(dc, sp, iconX + (shown * 34), 200, 10, c);
+                shown++;
+            }
+        }
+
+        // 6. Left-Edge Garmin Options Indicator (curved white bar + 3 vertical dots, exact photo)
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 14, 66, Theme.fSmall, hrText + " bpm", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setPenWidth(3);
+        dc.drawArc(cx, cy, cx - 10, Graphics.ARC_COUNTER_CLOCKWISE, 170, 190);
+        dc.fillCircle(24, cy - 12, 3);
+        dc.fillCircle(22, cy, 3);
+        dc.fillCircle(24, cy + 12, 3);
 
-        // 2. Native Garmin Profile Title & Active Sport Icon + 0:00 Chrono
-        dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 98, Theme.fMedium,
-            SportDefinitions.getProfileName(manager.settings.profileId).toUpper(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // 7. Signature Bright Magenta/Red Horizontal Accent Divider Line (exact photo)
+        dc.setColor(0xFF0055, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawLine(16, splitY, w - 16, splitY);
 
-        SportIcons.drawSportIcon(dc, curSport, cx - 78, 140, 16, sportColor);
+        // 8. Bottom Half: Current Clock + Green Battery Icon (exact photo)
+        var clock = System.getClockTime();
+        var timeStr = clock.hour.format("%02d") + ":" + clock.min.format("%02d");
+        var stats = System.getSystemStats();
+        var battPct = stats.battery.toNumber();
+
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 12, 140, Theme.fValueBig, "0:00", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx - 16, 256, Graphics.FONT_SMALL, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        SportIcons.drawBatteryIcon(dc, cx + 32, 249, 26, 14, battPct);
 
-        // 3. Transition indicator: "SUIVANT : T1"
-        var nextLabel = (nextSport != null)
-            ? ("SUIVANT : " + SportDefinitions.getSportShortName(nextSport as Number))
-            : "PRÊT AU DÉPART";
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 178, Theme.fLabel, nextLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // 9. Huge White 0:00 with Superscript 00 Hundredths (exact photo: 0:00⁰⁰)
+        var mainZero = "0:00";
+        var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_NUMBER_HOT);
+        var zeroLeft = cx - (zeroW / 2) - 10;
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(zeroLeft, 312, Graphics.FONT_NUMBER_HOT, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft + zeroW + 4, 298, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 4. 3-Column Data Preview (DIST | ALLURE | TEMPS)
-        dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(1);
-        dc.drawLine(34, 196, w - 34, 196);
-        dc.drawLine(34, 250, w - 34, 250);
-        dc.drawLine(134, 200, 134, 246);
-        dc.drawLine(256, 200, 256, 246);
+        // 10. Bottom Downward White Chevron "v" (exact photo)
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawLine(cx - 9, 358, cx, 367);
+        dc.drawLine(cx, 367, cx + 9, 358);
 
-        var paceLabel = SportDefinitions.isBike(curSport) ? "VIT." : "ALLURE";
-        var distInit = SportDefinitions.isSwim(curSport) ? "0 m" : "0.00";
-        var paceInit = SportDefinitions.isBike(curSport) ? "0.0" : "--:--";
-
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(78, 210, Theme.fLabel, "DIST", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, 210, Theme.fLabel, paceLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(312, 210, Theme.fLabel, "TEMPS", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(78, 234, Theme.fSmall, distInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, 234, Theme.fSmall, paceInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(312, 234, Theme.fSmall, "0:00", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // 5. Visual chain of chained multisport segments with luminous green active ring
-        GarminComponents.drawSportChain(dc, manager.legs, manager.currentLegIndex, 286);
-
-        // 6. Bottom Status Bar: Current Time, GPS icon, Battery gauge & %
-        GarminComponents.drawStatusBar(dc, manager.gpsQuality, 344);
-
-        // 7. Native Garmin Green START Arc Accent near top-right START button (~28 deg)
+        // 11. Subtle Green START Bezel Accent on Top-Right (exact photo)
         dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(6);
-        dc.drawArc(cx, cy, cx - 5, Graphics.ARC_CLOCKWISE, 36, 16);
+        dc.setPenWidth(5);
+        dc.drawArc(cx, cy, cx - 4, Graphics.ARC_CLOCKWISE, 35, 17);
 
-        // 8. Right-edge pagination dots
-        GarminComponents.drawPaginationDots(dc, 0, 5);
-
-        // Alert banner if profile changed or GPS locked
-        if (manager.alertMessage != null) {
-            GarminComponents.drawAlertBanner(dc, manager.alertMessage as String, manager.alertSubMessage);
-        }
+        // Full-screen Garmin overlay if active (e.g. profile switch)
+        GarminComponents.drawGarminOverlay(dc, manager);
     }
 }
 
@@ -123,12 +148,12 @@ class PreStartDelegate extends WatchUi.BehaviorDelegate {
         manager = mgr;
     }
 
-    // START/STOP -> Launch Multisport Activity
+    // START/STOP -> Launch Multisport Activity with native Garmin Big Green Triangle
     function onSelect() as Boolean {
         manager.startActivity();
         var activeView = new ActiveDataView(manager);
         var activeDelegate = new ActiveDataDelegate(manager, activeView);
-        WatchUi.switchToView(activeView, activeDelegate, WatchUi.SLIDE_LEFT);
+        WatchUi.switchToView(activeView, activeDelegate, WatchUi.SLIDE_IMMEDIATE);
         return true;
     }
 
@@ -149,11 +174,6 @@ class PreStartDelegate extends WatchUi.BehaviorDelegate {
         manager.settings.profileId = (manager.settings.profileId + 1) % 4;
         manager.settings.save();
         manager.rebuildProfile();
-        manager.showAlert(
-            SportDefinitions.getProfileName(manager.settings.profileId),
-            manager.legs.size().toString() + " étapes",
-            2
-        );
         WatchUi.requestUpdate();
         return true;
     }
