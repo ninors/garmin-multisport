@@ -3,8 +3,22 @@ import Toybox.Lang;
 import Toybox.Math;
 import Toybox.Position;
 import Toybox.System;
+import Toybox.WatchUi;
 
 module GarminComponents {
+
+    var bmpGlowTR as WatchUi.BitmapResource?;
+    var bmpGlowBR as WatchUi.BitmapResource?;
+    var glowsLoaded as Boolean = false;
+
+    function ensureGlows() as Void {
+        if (glowsLoaded) {
+            return;
+        }
+        glowsLoaded = true;
+        bmpGlowTR = WatchUi.loadResource(Rez.Drawables.GlowTopRight) as WatchUi.BitmapResource;
+        bmpGlowBR = WatchUi.loadResource(Rez.Drawables.GlowBotRight) as WatchUi.BitmapResource;
+    }
 
     // Top 5-zone HR arc (Pre-Start screen)
     // Spans 142 deg (top-left) clockwise to 38 deg (top-right) = 104 deg total
@@ -406,23 +420,21 @@ module GarminComponents {
         }
     }
 
-    // Native Garmin Glowing Curved Action Arc (e.g. Top-Right START 28 deg, Bottom-Right LAP 332 deg)
+    // Native Garmin Glowing Cyan-Blue Curved Action Arc (SVG bitmap with smooth gradient halo!)
+    // centerDeg < 90 => Top-Right (START/STOP), centerDeg > 270 => Bottom-Right (BACK/LAP)
     function drawActionGlowArc(dc as Dc, centerDeg as Number, coreColor as Number, midColor as Number, dimColor as Number) as Void {
-        var cx = dc.getWidth() / 2;
-        var cy = dc.getHeight() / 2;
-        var r = cx - 6;
-
-        dc.setPenWidth(8);
-        dc.setColor(dimColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 13, centerDeg + 13);
-
-        dc.setPenWidth(6);
-        dc.setColor(midColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 9, centerDeg + 9);
-
-        dc.setPenWidth(4);
-        dc.setColor(coreColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, centerDeg - 5, centerDeg + 5);
+        ensureGlows();
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        if (centerDeg < 90) {
+            if (bmpGlowTR != null) {
+                dc.drawBitmap(w - bmpGlowTR.getWidth() - 4, 48, bmpGlowTR);
+            }
+        } else {
+            if (bmpGlowBR != null) {
+                dc.drawBitmap(w - bmpGlowBR.getWidth() - 4, h - bmpGlowBR.getHeight() - 48, bmpGlowBR);
+            }
+        }
     }
 
     // Paused Red Ring Indicator

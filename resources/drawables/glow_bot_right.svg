@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="84" height="110" viewBox="0 0 84 110">
+  <defs>
+    <radialGradient id="haloBR" cx="88%" cy="52%" r="72%" fx="92%" fy="52%">
+      <stop offset="0%" stop-color="#00EEFF" stop-opacity="0.85"/>
+      <stop offset="30%" stop-color="#0099CC" stop-opacity="0.45"/>
+      <stop offset="65%" stop-color="#004466" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arcBR" x1="88%" y1="4%" x2="18%" y2="94%">
+      <stop offset="0%" stop-color="#0055AA" stop-opacity="0"/>
+      <stop offset="22%" stop-color="#0088DD" stop-opacity="0.75"/>
+      <stop offset="50%" stop-color="#55FFFF" stop-opacity="1"/>
+      <stop offset="78%" stop-color="#0088DD" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#0055AA" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M 78 8 A 190 190 0 0 1 28 102 L 6 86 A 164 164 0 0 0 46 8 Z" fill="url(#haloBR)"/>
+  <path d="M 77 8 A 189 189 0 0 1 25 102" fill="none" stroke="url(#arcBR)" stroke-width="6.5" stroke-linecap="round"/>
+</svg>

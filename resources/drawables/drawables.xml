@@ -6,4 +6,6 @@
     <bitmap id="IcTrans" filename="ic_trans.svg" />
     <bitmap id="IcWalk" filename="ic_walk.svg" />
     <bitmap id="IcCardio" filename="ic_cardio.svg" />
+    <bitmap id="GlowTopRight" filename="glow_top_right.svg" />
+    <bitmap id="GlowBotRight" filename="glow_bot_right.svg" />
 </drawables>

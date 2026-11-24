@@ -5,7 +5,6 @@ import Toybox.WatchUi;
 
 // Authentic Garmin Post-Activity Self-Evaluation ("Ressenti") with 5 Curved Smileys on Right Edge
 class FeelEvalView extends WatchUi.View {
-    private var manager as MultisportManager;
     public var selected as Number; // 0 = Très faible .. 4 = Très bon
 
     private static const FEEL_LABELS = [
@@ -26,7 +25,6 @@ class FeelEvalView extends WatchUi.View {
 
     function initialize(mgr as MultisportManager) {
         View.initialize();
-        manager = mgr;
         selected = mgr.feelRating;
     }
 
