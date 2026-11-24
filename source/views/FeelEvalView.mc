@@ -152,15 +152,17 @@ class FeelEvalDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        return true;
+    }
+
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_UP) {
             view.moveDown();
-            return true;
         } else if (dir == WatchUi.SWIPE_DOWN) {
             view.moveUp();
-            return true;
         }
-        return false;
+        return true;
     }
 }

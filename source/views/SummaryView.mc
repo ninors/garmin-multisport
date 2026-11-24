@@ -356,16 +356,18 @@ class SummaryDelegate extends WatchUi.BehaviorDelegate {
         return exitToPreStart();
     }
 
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        return true;
+    }
+
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_UP) {
             view.nextPage();
-            return true;
         } else if (dir == WatchUi.SWIPE_DOWN) {
             view.prevPage();
-            return true;
         }
-        return false;
+        return true;
     }
 
     private function exitToPreStart() as Boolean {

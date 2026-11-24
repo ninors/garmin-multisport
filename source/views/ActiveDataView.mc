@@ -657,7 +657,12 @@ class ActiveDataDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    // Touch swipe: vertical = change data page
+    // Block all screen taps (no accidental pause/select in water or rain!)
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        return true;
+    }
+
+    // Touch swipe: ONLY vertical swipe allowed to scroll data screens; block horizontal swipes
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         if (manager.isLocked) {
             return true;
@@ -665,11 +670,9 @@ class ActiveDataDelegate extends WatchUi.BehaviorDelegate {
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_UP) {
             view.nextPage();
-            return true;
         } else if (dir == WatchUi.SWIPE_DOWN) {
             view.prevPage();
-            return true;
         }
-        return false;
+        return true;
     }
 }

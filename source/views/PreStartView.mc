@@ -174,17 +174,12 @@ class PreStartDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    // Touch swipe support
+    // Disable touch taps & swipes on Pre-Start (prevent accidental start/profile change)
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        return true;
+    }
+
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
-        var dir = evt.getDirection();
-        if (dir == WatchUi.SWIPE_UP) {
-            return onNextPage();
-        } else if (dir == WatchUi.SWIPE_DOWN) {
-            return onPreviousPage();
-        } else if (dir == WatchUi.SWIPE_RIGHT) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            return true;
-        }
-        return false;
+        return true;
     }
 }
