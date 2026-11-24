@@ -136,45 +136,45 @@ class PreStartView extends WatchUi.View {
     }
 }
 
-class PreStartDelegate extends WatchUi.BehaviorDelegate {
+// Uses WatchUi.InputDelegate directly so physical buttons work 100%
+// and screen taps NEVER launch or change anything!
+class PreStartDelegate extends WatchUi.InputDelegate {
     private var manager as MultisportManager;
 
     function initialize(mgr as MultisportManager) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         manager = mgr;
     }
 
-    // START/STOP -> Launch Multisport Activity with native Garmin Big Green Triangle
-    function onSelect() as Boolean {
-        manager.startActivity();
-        var activeView = new ActiveDataView(manager);
-        var activeDelegate = new ActiveDataDelegate(manager, activeView);
-        WatchUi.switchToView(activeView, activeDelegate, WatchUi.SLIDE_IMMEDIATE);
-        return true;
+    function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_ENTER) {
+            // Physical START/STOP -> Launch Multisport Activity
+            manager.startActivity();
+            var activeView = new ActiveDataView(manager);
+            var activeDelegate = new ActiveDataDelegate(manager, activeView);
+            WatchUi.switchToView(activeView, activeDelegate, WatchUi.SLIDE_IMMEDIATE);
+            return true;
+        } else if (k == WatchUi.KEY_ESC) {
+            // Physical BACK -> Exit Watch App cleanly
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return true;
+        } else if (k == WatchUi.KEY_UP || k == WatchUi.KEY_MENU) {
+            // Physical UP / MENU -> Open Settings Menu
+            MainSettingsMenu.push(manager);
+            return true;
+        } else if (k == WatchUi.KEY_DOWN) {
+            // Physical DOWN -> Cycle Multisport Profile
+            manager.settings.profileId = (manager.settings.profileId + 1) % 5;
+            manager.settings.save();
+            manager.rebuildProfile();
+            WatchUi.requestUpdate();
+            return true;
+        }
+        return false;
     }
 
-    // Long press UP (MENU) -> Open Full Settings Menu
-    function onMenu() as Boolean {
-        MainSettingsMenu.push(manager);
-        return true;
-    }
-
-    // UP -> Open Settings Menu
-    function onPreviousPage() as Boolean {
-        MainSettingsMenu.push(manager);
-        return true;
-    }
-
-    // DOWN -> Quick cycle Multisport Profile (Triathlon / Duathlon / Swimrun / Aquathlon / Perso)
-    function onNextPage() as Boolean {
-        manager.settings.profileId = (manager.settings.profileId + 1) % 5;
-        manager.settings.save();
-        manager.rebuildProfile();
-        WatchUi.requestUpdate();
-        return true;
-    }
-
-    // Disable touch taps & swipes on Pre-Start (prevent accidental start/profile change)
+    // Block ALL screen taps & swipes on Pre-Start
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         return true;
     }

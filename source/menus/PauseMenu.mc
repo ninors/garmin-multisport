@@ -78,10 +78,9 @@ class DiscardConfirmDelegate extends WatchUi.ConfirmationDelegate {
 
     function onResponse(response as WatchUi.Confirm) as Boolean {
         if (response == WatchUi.CONFIRM_YES) {
+            // Sets state = STATE_PRE_START; Garmin auto-pops Confirmation back to ActiveDataView,
+            // whose onShow() immediately switches cleanly to PreStartView!
             manager.discardAll();
-            var preView = new PreStartView(manager);
-            var preDel = new PreStartDelegate(manager);
-            WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
         } else {
             if (manager.state == MultisportManager.STATE_PAUSED) {
                 manager.togglePause();

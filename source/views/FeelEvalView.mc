@@ -118,38 +118,31 @@ class FeelEvalView extends WatchUi.View {
     }
 }
 
-class FeelEvalDelegate extends WatchUi.BehaviorDelegate {
+class FeelEvalDelegate extends WatchUi.InputDelegate {
     private var manager as MultisportManager;
     private var view as FeelEvalView;
 
     function initialize(mgr as MultisportManager, v as FeelEvalView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         manager = mgr;
         view = v;
     }
 
-    function onPreviousPage() as Boolean {
-        view.moveUp();
-        return true;
-    }
-
-    function onNextPage() as Boolean {
-        view.moveDown();
-        return true;
-    }
-
-    function onSelect() as Boolean {
-        manager.commitSaveWithFeel(view.selected);
-        var sumView = new SummaryView(manager);
-        WatchUi.switchToView(sumView, new SummaryDelegate(manager, sumView), WatchUi.SLIDE_LEFT);
-        return true;
-    }
-
-    function onBack() as Boolean {
-        manager.commitSaveWithFeel(view.selected);
-        var sumView = new SummaryView(manager);
-        WatchUi.switchToView(sumView, new SummaryDelegate(manager, sumView), WatchUi.SLIDE_LEFT);
-        return true;
+    function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_UP) {
+            view.moveUp();
+            return true;
+        } else if (k == WatchUi.KEY_DOWN) {
+            view.moveDown();
+            return true;
+        } else if (k == WatchUi.KEY_ENTER || k == WatchUi.KEY_ESC) {
+            manager.commitSaveWithFeel(view.selected);
+            var sumView = new SummaryView(manager);
+            WatchUi.switchToView(sumView, new SummaryDelegate(manager, sumView), WatchUi.SLIDE_LEFT);
+            return true;
+        }
+        return false;
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {

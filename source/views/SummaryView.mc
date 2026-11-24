@@ -322,38 +322,36 @@ class SummaryView extends WatchUi.View {
     }
 }
 
-class SummaryDelegate extends WatchUi.BehaviorDelegate {
+class SummaryDelegate extends WatchUi.InputDelegate {
     private var manager as MultisportManager;
     private var view as SummaryView;
 
     function initialize(mgr as MultisportManager, v as SummaryView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         manager = mgr;
         view = v;
     }
 
-    function onNextPage() as Boolean {
-        view.nextPage();
-        return true;
-    }
-
-    function onPreviousPage() as Boolean {
-        view.prevPage();
-        return true;
-    }
-
-    function onMenu() as Boolean {
-        MainSettingsMenu.push(manager);
-        return true;
-    }
-
-    // Activity is ALREADY saved in all cases: START or BACK cleanly exits back to Pre-Start
-    function onSelect() as Boolean {
-        return exitToPreStart();
-    }
-
-    function onBack() as Boolean {
-        return exitToPreStart();
+    function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_DOWN) {
+            view.nextPage();
+            return true;
+        } else if (k == WatchUi.KEY_UP) {
+            view.prevPage();
+            return true;
+        } else if (k == WatchUi.KEY_MENU) {
+            MainSettingsMenu.push(manager);
+            return true;
+        } else if (k == WatchUi.KEY_ENTER || k == WatchUi.KEY_ESC) {
+            // Activity is ALREADY saved in all cases: physical START or BACK cleanly returns to Pre-Start
+            manager.resetToPreStart();
+            var preView = new PreStartView(manager);
+            var preDel = new PreStartDelegate(manager);
+            WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
+            return true;
+        }
+        return false;
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
@@ -367,14 +365,6 @@ class SummaryDelegate extends WatchUi.BehaviorDelegate {
         } else if (dir == WatchUi.SWIPE_DOWN) {
             view.prevPage();
         }
-        return true;
-    }
-
-    private function exitToPreStart() as Boolean {
-        manager.resetToPreStart();
-        var preView = new PreStartView(manager);
-        var preDel = new PreStartDelegate(manager);
-        WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
         return true;
     }
 }

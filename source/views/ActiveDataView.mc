@@ -20,6 +20,15 @@ class ActiveDataView extends WatchUi.View {
         dotsVisibleUntilTick = mgr.tickCount + 3;
     }
 
+    // Safely transition back to PreStartView AFTER Confirmation dialog pops on Discard!
+    function onShow() as Void {
+        if (manager.state == MultisportManager.STATE_PRE_START) {
+            var preView = new PreStartView(manager);
+            var preDel = new PreStartDelegate(manager);
+            WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
+        }
+    }
+
     public function nextPage() as Void {
         currentPage = (currentPage + 1) % TOTAL_PAGES;
         dotsVisibleUntilTick = manager.tickCount + 3;
@@ -587,82 +596,79 @@ class ActiveDataView extends WatchUi.View {
     }
 }
 
-class ActiveDataDelegate extends WatchUi.BehaviorDelegate {
+// Uses WatchUi.InputDelegate directly so screen taps NEVER pause/start/change sport!
+// Touch is ONLY allowed for vertical swipe to scroll data screens.
+class ActiveDataDelegate extends WatchUi.InputDelegate {
     private var manager as MultisportManager;
     private var view as ActiveDataView;
 
     function initialize(mgr as MultisportManager, v as ActiveDataView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         manager = mgr;
         view = v;
     }
 
-    // START/STOP -> Pause & Open FR965 Pause Menu
-    function onSelect() as Boolean {
-        if (manager.isLocked) {
-            manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
-            WatchUi.requestUpdate();
-            return true;
-        }
-        if (manager.state == MultisportManager.STATE_ACTIVE) {
-            manager.togglePause();
-        }
-        PauseMenu.push(manager);
-        return true;
-    }
-
-    // BACK/LAP -> Directly advance to next segment/transition (FR965 native multisport behavior)
-    function onBack() as Boolean {
-        if (manager.isLocked) {
-            manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
-            WatchUi.requestUpdate();
-            return true;
-        }
-        var finished = manager.nextSegment();
-        if (finished) {
-            var evalView = new FeelEvalView(manager);
-            WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
-        } else {
-            WatchUi.requestUpdate();
-        }
-        return true;
-    }
-
-    function onNextPage() as Boolean {
-        view.nextPage();
-        return true;
-    }
-
-    function onPreviousPage() as Boolean {
-        view.prevPage();
-        return true;
-    }
-
-    function onMenu() as Boolean {
-        if (manager.isLocked) {
-            return true;
-        }
-        MainSettingsMenu.push(manager);
-        return true;
-    }
-
-    // LIGHT key toggles screen lock
     function onKey(evt as WatchUi.KeyEvent) as Boolean {
-        if (evt.getKey() == WatchUi.KEY_LIGHT) {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_LIGHT) {
             manager.isLocked = !manager.isLocked;
             manager.showAlert(manager.isLocked ? "VERROUILLÉ" : "DÉVERROUILLÉ", "", 2);
             WatchUi.requestUpdate();
             return true;
         }
+        if (k == WatchUi.KEY_ENTER) {
+            // Physical START/STOP -> Pause & Open PauseMenu
+            if (manager.isLocked) {
+                manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
+                WatchUi.requestUpdate();
+                return true;
+            }
+            if (manager.state == MultisportManager.STATE_ACTIVE) {
+                manager.togglePause();
+            }
+            PauseMenu.push(manager);
+            return true;
+        } else if (k == WatchUi.KEY_ESC) {
+            // Physical BACK/LAP -> Next segment / transition
+            if (manager.isLocked) {
+                manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
+                WatchUi.requestUpdate();
+                return true;
+            }
+            var finished = manager.nextSegment();
+            if (finished) {
+                var evalView = new FeelEvalView(manager);
+                WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
+            } else {
+                WatchUi.requestUpdate();
+            }
+            return true;
+        } else if (k == WatchUi.KEY_DOWN) {
+            view.nextPage();
+            return true;
+        } else if (k == WatchUi.KEY_UP) {
+            view.prevPage();
+            return true;
+        } else if (k == WatchUi.KEY_MENU) {
+            if (!manager.isLocked) {
+                MainSettingsMenu.push(manager);
+            }
+            return true;
+        }
         return false;
     }
 
-    // Block all screen taps (no accidental pause/select in water or rain!)
+    // Long-press UP (HOLD on KEY_UP) opens Settings on devices that fire onHold/KEY_MENU
+    function onHold(evt as WatchUi.ClickEvent) as Boolean {
+        return true;
+    }
+
+    // Block ALL screen taps (never pauses, starts, or changes sport on touch!)
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         return true;
     }
 
-    // Touch swipe: ONLY vertical swipe allowed to scroll data screens; block horizontal swipes
+    // Touch swipe: ONLY vertical swipe allowed to scroll data screens
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         if (manager.isLocked) {
             return true;
