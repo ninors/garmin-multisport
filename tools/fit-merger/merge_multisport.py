@@ -91,10 +91,12 @@ def try_split_continuous_fit(fit_path: Path, output_path: Path) -> bool:
                     if vals and vals[0] is not None:
                         feel_level = int(vals[0])
         elif isinstance(msg, LapMessage):
-            # Look for FitContributor developer field id=0 (`ms_sport`)
+            # Look for FitContributor developer field id=0 (`ms_sport`) in developer_fields or fields
             dev_sport = None
-            for f in getattr(msg, "developer_fields", []) or []:
-                if getattr(f, "field_id", None) == 0:
+            for f in (getattr(msg, "developer_fields", []) or []) + (getattr(msg, "fields", []) or []):
+                fname = (getattr(f, "name", "") or "").lower()
+                fid = getattr(f, "field_id", None)
+                if fname == "ms_sport" or (fid == 0 and f in (getattr(msg, "developer_fields", []) or [])):
                     vals = getattr(f, "values", None)
                     if vals and vals[0] is not None:
                         dev_sport = int(vals[0])
@@ -526,7 +528,10 @@ def main() -> int:
         tkey = (act.get("activityType") or {}).get("typeKey", "?")
         print(f"  - [{act.get('activityId')}] {act.get('startTimeGMT')} | {tkey} | {act.get('duration', 0):.0f}s | {act.get('activityName')}")
 
-    # Mode A: Check recent single-session continuous activities for FitContributor `ms_sport` lap tags
+    # Mode A: Check recent single-session continuous activities (last 72h) for FitContributor `ms_sport` lap tags
+    # Note: Garmin Connect's activity list endpoint often omits `lapCount`, so we inspect recent
+    # non-multisport activities directly instead of gating on `lapCount`.
+    now_utc = datetime.now(timezone.utc)
     existing_ms_starts = [
         parse_gmt_time(a.get("startTimeGMT") or "")
         for a in activities
@@ -537,23 +542,27 @@ def main() -> int:
         if "multi_sport" in tkey:
             continue
         start_dt = parse_gmt_time(act.get("startTimeGMT") or "")
-        if start_dt and any(ms and abs((ms - start_dt).total_seconds()) <= 180.0 for ms in existing_ms_starts):
+        if start_dt is None:
             continue
-        if (act.get("lapCount") or 0) >= 2:
-            act_id = act["activityId"]
-            try:
-                zip_bytes = client.download_activity(act_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
-                raw_path = work_dir / f"single_{act_id}.fit"
-                raw_path.write_bytes(extract_fit_from_zip(zip_bytes))
-                split_path = work_dir / f"split_{act_id}_multisport.fit"
-                if try_split_continuous_fit(raw_path, split_path):
-                    print(f"Split continuous Multisport activity {act_id} -> uploading native Multisport FIT (original preserved!)...")
-                    resp = client.upload_activity(str(split_path))
-                    print(f"Upload response for split {act_id}: {resp}")
-                    if start_dt:
-                        existing_ms_starts.append(start_dt)
-            except Exception as ex:
-                print(f"Note: skipped continuous split check for {act_id}: {ex}")
+        # Only inspect recent activities (last 72 hours) to stay fast & light
+        if (now_utc - start_dt).total_seconds() > 72 * 3600:
+            continue
+        if any(ms and abs((ms - start_dt).total_seconds()) <= 180.0 for ms in existing_ms_starts):
+            continue
+
+        act_id = act["activityId"]
+        try:
+            zip_bytes = client.download_activity(act_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
+            raw_path = work_dir / f"single_{act_id}.fit"
+            raw_path.write_bytes(extract_fit_from_zip(zip_bytes))
+            split_path = work_dir / f"split_{act_id}_multisport.fit"
+            if try_split_continuous_fit(raw_path, split_path):
+                print(f"Split continuous Multisport activity {act_id} -> uploading native Multisport FIT (original preserved!)...")
+                resp = client.upload_activity(str(split_path))
+                print(f"Upload response for split {act_id}: {resp}")
+                existing_ms_starts.append(start_dt)
+        except Exception as ex:
+            print(f"Note: skipped continuous split check for {act_id}: {ex}")
 
     # Mode B: Merge consecutive separate activities into a native Multisport FIT
     chains = detect_chronological_chains(activities)
