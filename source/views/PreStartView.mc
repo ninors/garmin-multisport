@@ -1,5 +1,6 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Position;
 import Toybox.WatchUi;
 
 class PreStartView extends WatchUi.View {
@@ -11,73 +12,103 @@ class PreStartView extends WatchUi.View {
     }
 
     function onUpdate(dc as Dc) as Void {
-        Theme.ensureFonts();
+        Theme.enableAA(dc);
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
         var w = dc.getWidth();
         var cx = w / 2;
+        var cy = dc.getHeight() / 2;
         var curSport = manager.getCurrentSport();
         var nextSport = manager.getNextSport();
         var sportColor = SportDefinitions.getSportColor(curSport);
 
-        // 1. Top 5-zone HR arc + red heart + BPM
-        var zPos = manager.getHrZonePosition(manager.heartRate);
-        var zIdx = manager.getHrZoneIndex(manager.heartRate);
-        GarminComponents.drawTopHrArc(dc, manager.heartRate, zPos, zIdx);
+        // 1. Native Garmin GPS Acquisition Arc at the very top edge
+        var gpsReady = (manager.gpsQuality >= Position.QUALITY_GOOD);
+        var gpsUsable = (manager.gpsQuality >= Position.QUALITY_POOR);
+        var gpsColor = gpsReady ? Theme.COLOR_GPS_GREEN : (gpsUsable ? Theme.COLOR_GPS_YELLOW : Theme.COLOR_GPS_RED);
 
-        // 2. Active Sport Vector Icon + Large White 0:00 Chrono
-        var chronoStr = "0:00";
-        var chronoW = dc.getTextWidthInPixels(chronoStr, Theme.fValueBig as Graphics.FontType);
-        var groupW = 42 + chronoW;
-        var startX = cx - (groupW / 2);
-        SportIcons.drawSportIcon(dc, curSport, startX + 16, 102, 16, sportColor);
+        // Background track for GPS arc
+        dc.setPenWidth(8);
+        dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, 42);
+
+        // Animated progress when searching GPS, full green arc when locked
+        dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
+        if (gpsReady) {
+            dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, 42);
+        } else {
+            var pulseStep = (manager.tickCount % 4) + 1; // 1..4
+            var endDeg = 138 - (pulseStep * 22);
+            if (endDeg < 42) { endDeg = 42; }
+            dc.drawArc(cx, cy, cx - 8, Graphics.ARC_CLOCKWISE, 138, endDeg);
+        }
+
+        // GPS Status Pill + Live HR right underneath
+        var gpsText = gpsReady ? "GPS PRÊT" : (gpsUsable ? "GPS FAIBLE" : "ATTENTE GPS...");
+        dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 38, Theme.fLabel, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Live Heart Rate badge (heart + BPM)
+        var hrText = (manager.heartRate > 30) ? manager.heartRate.toString() : "--";
+        SportIcons.drawHeart(dc, cx - 28, 66, 12, Theme.COLOR_HEART_RED);
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(startX + 40, 102, Theme.fValueBig as Graphics.FontType, chronoStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx - 14, 66, Theme.fSmall, hrText + " bpm", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 3. Transition indicator: "SUIVANT : T1" + profile name
+        // 2. Native Garmin Profile Title & Active Sport Icon + 0:00 Chrono
+        dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 98, Theme.fMedium,
+            SportDefinitions.getProfileName(manager.settings.profileId).toUpper(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        SportIcons.drawSportIcon(dc, curSport, cx - 78, 140, 16, sportColor);
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx + 12, 140, Theme.fValueBig, "0:00", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // 3. Transition indicator: "SUIVANT : T1"
         var nextLabel = (nextSport != null)
             ? ("SUIVANT : " + SportDefinitions.getSportShortName(nextSport as Number))
-            : SportDefinitions.getProfileName(manager.settings.profileId).toUpper();
+            : "PRÊT AU DÉPART";
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 144, Theme.fLabel as Graphics.FontType, nextLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 178, Theme.fLabel, nextLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 4. 3-Column Data Grid: DIST | ALLURE (or VIT.) | TEMPS
+        // 4. 3-Column Data Preview (DIST | ALLURE | TEMPS)
         dc.setColor(Theme.COLOR_DARK_LINE, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(1);
-        dc.drawLine(36, 164, w - 36, 164);
-        dc.drawLine(36, 234, w - 36, 234);
-        dc.drawLine(134, 170, 134, 228);
-        dc.drawLine(256, 170, 256, 228);
-
-        var col1X = 78;
-        var col2X = cx;
-        var col3X = 312;
+        dc.drawLine(34, 196, w - 34, 196);
+        dc.drawLine(34, 250, w - 34, 250);
+        dc.drawLine(134, 200, 134, 246);
+        dc.drawLine(256, 200, 256, 246);
 
         var paceLabel = SportDefinitions.isBike(curSport) ? "VIT." : "ALLURE";
         var distInit = SportDefinitions.isSwim(curSport) ? "0 m" : "0.00";
         var paceInit = SportDefinitions.isBike(curSport) ? "0.0" : "--:--";
 
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(col1X, 180, Theme.fLabel as Graphics.FontType, "DIST", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(col2X, 180, Theme.fLabel as Graphics.FontType, paceLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(col3X, 180, Theme.fLabel as Graphics.FontType, "TEMPS", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(78, 210, Theme.fLabel, "DIST", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 210, Theme.fLabel, paceLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(312, 210, Theme.fLabel, "TEMPS", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(sportColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(col1X, 212, Theme.fValueMed as Graphics.FontType, distInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(col2X, 212, Theme.fValueMed as Graphics.FontType, paceInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(col3X, 212, Theme.fValueMed as Graphics.FontType, "0:00", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(78, 234, Theme.fSmall, distInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 234, Theme.fSmall, paceInit, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(312, 234, Theme.fSmall, "0:00", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // 5. Visual chain of chained multisport segments with luminous green active ring
-        GarminComponents.drawSportChain(dc, manager.legs, manager.currentLegIndex, 276);
+        GarminComponents.drawSportChain(dc, manager.legs, manager.currentLegIndex, 286);
 
         // 6. Bottom Status Bar: Current Time, GPS icon, Battery gauge & %
-        GarminComponents.drawStatusBar(dc, manager.gpsQuality, 342);
+        GarminComponents.drawStatusBar(dc, manager.gpsQuality, 344);
 
-        // 7. Right-edge pagination dots
+        // 7. Native Garmin Green START Arc Accent near top-right START button (~28 deg)
+        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(6);
+        dc.drawArc(cx, cy, cx - 5, Graphics.ARC_CLOCKWISE, 36, 16);
+
+        // 8. Right-edge pagination dots
         GarminComponents.drawPaginationDots(dc, 0, 5);
 
-        // Alert banner if profile changed
+        // Alert banner if profile changed or GPS locked
         if (manager.alertMessage != null) {
             GarminComponents.drawAlertBanner(dc, manager.alertMessage as String, manager.alertSubMessage);
         }

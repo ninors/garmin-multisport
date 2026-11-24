@@ -145,37 +145,61 @@ class MultisportManager {
     }
 
     public function startSensors() as Void {
-        Sensor.setEnabledSensors([
-            Sensor.SENSOR_HEARTRATE,
-            Sensor.SENSOR_BIKECADENCE,
-            Sensor.SENSOR_BIKESPEED,
-            Sensor.SENSOR_BIKEPOWER,
-            Sensor.SENSOR_FOOTPOD
-        ]);
-        Sensor.enableSensorEvents(method(:onSensor));
+        // Safely enable supported sensors on fr165m (avoid crash on unsupported BIKEPOWER)
+        try {
+            Sensor.setEnabledSensors([
+                Sensor.SENSOR_HEARTRATE,
+                Sensor.SENSOR_BIKECADENCE,
+                Sensor.SENSOR_BIKESPEED,
+                Sensor.SENSOR_FOOTPOD
+            ]);
+        } catch (ex) {
+            try {
+                Sensor.setEnabledSensors([Sensor.SENSOR_HEARTRATE]);
+            } catch (ex2) {
+                // Ignore if simulator has restricted sensors
+            }
+        }
+        try {
+            Sensor.enableSensorEvents(method(:onSensor));
+        } catch (ex3) {
+        }
         configureGps();
     }
 
     public function stopSensors() as Void {
-        Sensor.enableSensorEvents(null);
-        Position.enableLocationEvents(Position.LOCATION_DISABLE, method(:onPosition));
+        try {
+            Sensor.enableSensorEvents(null);
+        } catch (ex) {
+        }
+        try {
+            Position.enableLocationEvents(Position.LOCATION_DISABLE, method(:onPosition));
+        } catch (ex2) {
+        }
         timer.stop();
     }
 
     public function configureGps() as Void {
-        var options = {
-            :acquisitionType => Position.LOCATION_CONTINUOUS
-        };
-        if (Position has :CONFIGURATION_GPS) {
-            if (settings.gpsMode == 0) {
-                options[:configuration] = Position.CONFIGURATION_GPS;
-            } else if (settings.gpsMode == 2 && Position has :CONFIGURATION_SAT_IQ) {
-                options[:configuration] = Position.CONFIGURATION_SAT_IQ;
-            } else if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1) {
-                options[:configuration] = Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1;
+        try {
+            var options = {
+                :acquisitionType => Position.LOCATION_CONTINUOUS
+            };
+            if (Position has :hasConfigurationSupport) {
+                if (settings.gpsMode == 0 && Position has :CONFIGURATION_GPS && Position.hasConfigurationSupport(Position.CONFIGURATION_GPS)) {
+                    options[:configuration] = Position.CONFIGURATION_GPS;
+                } else if (settings.gpsMode == 2 && Position has :CONFIGURATION_SAT_IQ && Position.hasConfigurationSupport(Position.CONFIGURATION_SAT_IQ)) {
+                    options[:configuration] = Position.CONFIGURATION_SAT_IQ;
+                } else if (Position has :CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1 && Position.hasConfigurationSupport(Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1)) {
+                    options[:configuration] = Position.CONFIGURATION_GPS_GLONASS_GALILEO_BEIDOU_L1;
+                }
+            }
+            Position.enableLocationEvents(options, method(:onPosition));
+        } catch (ex) {
+            try {
+                Position.enableLocationEvents(Position.LOCATION_CONTINUOUS, method(:onPosition));
+            } catch (ex2) {
             }
         }
-        Position.enableLocationEvents(options, method(:onPosition));
     }
 
     public function rebuildProfile() as Void {
@@ -425,8 +449,14 @@ class MultisportManager {
 
     // GPS Position callback
     public function onPosition(info as Position.Info) as Void {
+        var prevQuality = gpsQuality;
         if (info.accuracy != null) {
             gpsQuality = info.accuracy as Number;
+        }
+        // Native Garmin GPS-lock beep & banner on Pre-Start screen
+        if (state == STATE_PRE_START && prevQuality < Position.QUALITY_GOOD && gpsQuality >= Position.QUALITY_GOOD) {
+            triggerFeedback(Attention.TONE_KEY, 80);
+            showAlert("GPS PRÊT", "Appuyez sur START", 3);
         }
         if (info.speed != null && (info.speed as Float) >= 0.0f) {
             speedMps = info.speed as Float;
@@ -675,9 +705,12 @@ class MultisportManager {
 
     // Heart rate zone utilities (0..4 for Z1..Z5)
     private function loadHrZones() as Array<Number> {
-        var profileZones = UserProfile.getHeartRateZones(UserProfile.HR_ZONE_SPORT_GENERIC);
-        if (profileZones != null && profileZones.size() >= 6) {
-            return profileZones;
+        try {
+            var profileZones = UserProfile.getHeartRateZones(UserProfile.HR_ZONE_SPORT_GENERIC);
+            if (profileZones != null && profileZones.size() >= 6) {
+                return profileZones;
+            }
+        } catch (ex) {
         }
         return [95, 115, 135, 155, 175, 195] as Array<Number>;
     }

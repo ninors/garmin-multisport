@@ -24,7 +24,7 @@ class SummaryView extends WatchUi.View {
     }
 
     function onUpdate(dc as Dc) as Void {
-        Theme.ensureFonts();
+        Theme.enableAA(dc);
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 

@@ -2,17 +2,17 @@ import Toybox.Graphics;
 import Toybox.Lang;
 
 module Theme {
-    // Pure AMOLED Forerunner 965 Palette
+    // Pure AMOLED Forerunner 965 / 165 Native Palette
     const COLOR_BG = 0x000000;
     const COLOR_WHITE = 0xFFFFFF;
     const COLOR_LABEL = 0xAAAAAA;
     const COLOR_DIM = 0x555555;
     const COLOR_DARK_LINE = 0x333333;
     const COLOR_RED_DIVIDER = 0xFF0033;   // Signature FR965 red data grid lines
-    const COLOR_GREEN_RING = 0x00E64D;    // Active sport luminous green ring
+    const COLOR_GREEN_RING = 0x00E64D;    // Active sport & GPS ready green
     const COLOR_GREEN_GLOW = 0x005522;
     const COLOR_GPS_RED = 0xFF2233;
-    const COLOR_GPS_YELLOW = 0xFFCC00;
+    const COLOR_GPS_YELLOW = 0xFFAA00;
     const COLOR_GPS_GREEN = 0x00E64D;
     const COLOR_HEART_RED = 0xFF1133;
     const COLOR_BANNER_BG = 0x161616;
@@ -36,36 +36,23 @@ module Theme {
         return ZONE_COLORS[zoneIdx];
     }
 
-    // Vector font cache for crisp 390x390 AMOLED rendering
-    var fLabel as Graphics.FontType?;
-    var fSmall as Graphics.FontType?;
-    var fMedium as Graphics.FontType?;
-    var fValueMed as Graphics.FontType?;
-    var fValueBig as Graphics.FontType?;
-    var fChronoHuge as Graphics.FontType?;
-    var fChronoSup as Graphics.FontType?;
-    var fontsLoaded as Boolean = false;
+    // Native Garmin System Fonts (100% crash-free & authentic Forerunner look)
+    var fLabel as Graphics.FontType = Graphics.FONT_XTINY;
+    var fSmall as Graphics.FontType = Graphics.FONT_XTINY;
+    var fMedium as Graphics.FontType = Graphics.FONT_TINY;
+    var fValueMed as Graphics.FontType = Graphics.FONT_SMALL;
+    var fValueBig as Graphics.FontType = Graphics.FONT_NUMBER_MILD;
+    var fChronoHuge as Graphics.FontType = Graphics.FONT_NUMBER_MEDIUM;
+    var fChronoSup as Graphics.FontType = Graphics.FONT_SMALL;
 
     function ensureFonts() as Void {
-        if (fontsLoaded) {
-            return;
+        // Uses native Garmin system fonts directly so typography matches
+        // the built-in Forerunner 165 / 965 firmware with zero font crashes.
+    }
+
+    function enableAA(dc as Dc) as Void {
+        if (dc has :setAntiAlias) {
+            dc.setAntiAlias(true);
         }
-        fontsLoaded = true;
-        if (Graphics has :getVectorFont) {
-            fLabel = Graphics.getVectorFont({:face => "RobotoCondensedBold", :size => 18});
-            fSmall = Graphics.getVectorFont({:face => "RobotoCondensedRegular", :size => 20});
-            fMedium = Graphics.getVectorFont({:face => "RobotoCondensedBold", :size => 26});
-            fValueMed = Graphics.getVectorFont({:face => "BionicBold", :size => 34});
-            fValueBig = Graphics.getVectorFont({:face => "BionicBold", :size => 52});
-            fChronoHuge = Graphics.getVectorFont({:face => "BionicBold", :size => 64});
-            fChronoSup = Graphics.getVectorFont({:face => "BionicBold", :size => 32});
-        }
-        if (fLabel == null) { fLabel = Graphics.FONT_XTINY; }
-        if (fSmall == null) { fSmall = Graphics.FONT_XTINY; }
-        if (fMedium == null) { fMedium = Graphics.FONT_TINY; }
-        if (fValueMed == null) { fValueMed = Graphics.FONT_SMALL; }
-        if (fValueBig == null) { fValueBig = Graphics.FONT_NUMBER_MILD; }
-        if (fChronoHuge == null) { fChronoHuge = Graphics.FONT_NUMBER_MEDIUM; }
-        if (fChronoSup == null) { fChronoSup = Graphics.FONT_SMALL; }
     }
 }
