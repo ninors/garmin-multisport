@@ -1,0 +1,9 @@
+bin/
+*.prg
+*.prg.debug.xml
+*.iq
+__pycache__/
+*.pyc
+.env
+.garth/
+tmp_fits/

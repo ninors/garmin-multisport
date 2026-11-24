@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build fr165m",
+            "type": "monkeyc",
+            "command": "build",
+            "device": "fr165m",
+            "problemMatcher": []
+        }
+    ]
+}

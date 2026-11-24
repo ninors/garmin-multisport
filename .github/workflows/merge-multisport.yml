@@ -1,0 +1,29 @@
+name: Merge Garmin Multisport FIT
+
+on:
+  schedule:
+    # Run automatically every 30 minutes
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  merge-multisport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r tools/fit-merger/requirements.txt
+
+      - name: Run Multisport FIT Merger
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          DELETE_ORIGINAL_LEGS: "false"
+        run: python tools/fit-merger/merge_multisport.py
