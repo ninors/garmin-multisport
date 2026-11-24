@@ -21,11 +21,14 @@ class SettingsModel {
     // Custom multisport profile legs
     public var customSports as Array<Number>;
 
-    // Customizable main screen fields (Left / Right) per discipline
+    // Customizable main screen fields (Top / Left / Right) per discipline
+    public var swimFieldTop as Number;
     public var swimFieldLeft as Number;
     public var swimFieldRight as Number;
+    public var bikeFieldTop as Number;
     public var bikeFieldLeft as Number;
     public var bikeFieldRight as Number;
+    public var runFieldTop as Number;
     public var runFieldLeft as Number;
     public var runFieldRight as Number;
 
@@ -49,10 +52,13 @@ class SettingsModel {
         timeAlertMin = loadNumber("timeAlertMin", 0);
         nutritionAlertMin = loadNumber("nutritionAlertMin", 20);
 
+        swimFieldTop = loadNumber("swimFieldTop", SportDefinitions.FIELD_CHRONO);
         swimFieldLeft = loadNumber("swimFieldLeft", SportDefinitions.FIELD_DISTANCE);
         swimFieldRight = loadNumber("swimFieldRight", SportDefinitions.FIELD_PACE);
+        bikeFieldTop = loadNumber("bikeFieldTop", SportDefinitions.FIELD_CHRONO);
         bikeFieldLeft = loadNumber("bikeFieldLeft", SportDefinitions.FIELD_DISTANCE);
         bikeFieldRight = loadNumber("bikeFieldRight", SportDefinitions.FIELD_SPEED);
+        runFieldTop = loadNumber("runFieldTop", SportDefinitions.FIELD_CHRONO);
         runFieldLeft = loadNumber("runFieldLeft", SportDefinitions.FIELD_DISTANCE);
         runFieldRight = loadNumber("runFieldRight", SportDefinitions.FIELD_PACE);
 
@@ -87,10 +93,13 @@ class SettingsModel {
         Storage.setValue("timeAlertMin", timeAlertMin);
         Storage.setValue("nutritionAlertMin", nutritionAlertMin);
 
+        Storage.setValue("swimFieldTop", swimFieldTop);
         Storage.setValue("swimFieldLeft", swimFieldLeft);
         Storage.setValue("swimFieldRight", swimFieldRight);
+        Storage.setValue("bikeFieldTop", bikeFieldTop);
         Storage.setValue("bikeFieldLeft", bikeFieldLeft);
         Storage.setValue("bikeFieldRight", bikeFieldRight);
+        Storage.setValue("runFieldTop", runFieldTop);
         Storage.setValue("runFieldLeft", runFieldLeft);
         Storage.setValue("runFieldRight", runFieldRight);
 
@@ -101,6 +110,15 @@ class SettingsModel {
             storedList.add(customSports[i]);
         }
         Storage.setValue("customSports", storedList);
+    }
+
+    public function getFieldTopForSport(sport as Number) as Number {
+        if (SportDefinitions.isSwim(sport)) {
+            return swimFieldTop;
+        } else if (SportDefinitions.isBike(sport)) {
+            return bikeFieldTop;
+        }
+        return runFieldTop;
     }
 
     public function getFieldLeftForSport(sport as Number) as Number {

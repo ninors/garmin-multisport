@@ -79,10 +79,11 @@ class MultisportManager {
     // Lock state (LIGHT button long/toggle)
     public var isLocked as Boolean;
 
-    // GPS track ring buffer (max 160 points for low RAM)
+    // GPS track ring buffer (max 160 points for low RAM, tagged with sport for multi-color map!)
     public static const MAX_TRACK_POINTS = 160;
     public var trackLats as Array<Float>;
     public var trackLons as Array<Float>;
+    public var trackSports as Array<Number>;
     private var lastTrackLat as Double;
     private var lastTrackLon as Double;
     private var hasLastTrack as Boolean;
@@ -142,6 +143,7 @@ class MultisportManager {
 
         trackLats = [] as Array<Float>;
         trackLons = [] as Array<Float>;
+        trackSports = [] as Array<Number>;
         lastTrackLat = 0.0d;
         lastTrackLon = 0.0d;
         hasLastTrack = false;
@@ -287,6 +289,7 @@ class MultisportManager {
         zoneSeconds = [0, 0, 0, 0, 0] as Array<Number>;
         trackLats = [] as Array<Float>;
         trackLons = [] as Array<Float>;
+        trackSports = [] as Array<Number>;
         hasLastTrack = false;
         lastNutritionAlertSec = 0;
         lastDistAlertMeters = 0.0f;
@@ -520,18 +523,22 @@ class MultisportManager {
         hasLastTrack = true;
 
         if (trackLats.size() >= MAX_TRACK_POINTS) {
-            // Downsample by keeping every 2nd point to preserve entire route shape
+            // Downsample by keeping every 2nd point to preserve entire route shape & colors
             var newLats = [] as Array<Float>;
             var newLons = [] as Array<Float>;
+            var newSports = [] as Array<Number>;
             for (var i = 0; i < trackLats.size(); i += 2) {
                 newLats.add(trackLats[i]);
                 newLons.add(trackLons[i]);
+                newSports.add(trackSports[i]);
             }
             trackLats = newLats;
             trackLons = newLons;
+            trackSports = newSports;
         }
         trackLats.add(lat.toFloat());
         trackLons.add(lon.toFloat());
+        trackSports.add(getCurrentSport());
     }
 
     // 1 Hz main heartbeat
@@ -830,6 +837,8 @@ class MultisportManager {
             case SportDefinitions.FIELD_SWOLF:
                 var sw = seg.getEstimatedSwolf(settings.poolLengthMeters);
                 return (sw > 0) ? sw.toString() : "--";
+            case SportDefinitions.FIELD_CHRONO:
+                return SportDefinitions.formatTime(seg.elapsedMs);
             default:
                 return "--";
         }

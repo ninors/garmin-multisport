@@ -17,15 +17,10 @@ module AlertAndFieldMenus {
     }
 
     function pushDataFieldsMenu(manager as MultisportManager) as Void {
-        var s = manager.settings;
         var menu = new WatchUi.Menu2({:title => "Écrans de données"});
-
-        menu.addItem(new WatchUi.MenuItem("Nage : Gauche", SportDefinitions.getFieldLabel(s.swimFieldLeft), :swim_l, null));
-        menu.addItem(new WatchUi.MenuItem("Nage : Droite", SportDefinitions.getFieldLabel(s.swimFieldRight), :swim_r, null));
-        menu.addItem(new WatchUi.MenuItem("Vélo : Gauche", SportDefinitions.getFieldLabel(s.bikeFieldLeft), :bike_l, null));
-        menu.addItem(new WatchUi.MenuItem("Vélo : Droite", SportDefinitions.getFieldLabel(s.bikeFieldRight), :bike_r, null));
-        menu.addItem(new WatchUi.MenuItem("Course : Gauche", SportDefinitions.getFieldLabel(s.runFieldLeft), :run_l, null));
-        menu.addItem(new WatchUi.MenuItem("Course : Droite", SportDefinitions.getFieldLabel(s.runFieldRight), :run_r, null));
+        menu.addItem(new WatchUi.MenuItem("Natation", "Éditeur visuel 3 champs", :edit_swim, null));
+        menu.addItem(new WatchUi.MenuItem("Vélo", "Éditeur visuel 3 champs", :edit_bike, null));
+        menu.addItem(new WatchUi.MenuItem("Course à pied", "Éditeur visuel 3 champs", :edit_run, null));
 
         WatchUi.pushView(menu, new DataFieldsMenuDelegate(manager), WatchUi.SLIDE_LEFT);
     }
@@ -85,7 +80,6 @@ class AlertsMenuDelegate extends WatchUi.Menu2InputDelegate {
 
 class DataFieldsMenuDelegate extends WatchUi.Menu2InputDelegate {
     private var manager as MultisportManager;
-    private static const FIELD_COUNT = 13;
 
     function initialize(mgr as MultisportManager) {
         Menu2InputDelegate.initialize();
@@ -94,30 +88,11 @@ class DataFieldsMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
-        var s = manager.settings;
-        var nextField = 0;
-
-        if (id == :swim_l) {
-            s.swimFieldLeft = (s.swimFieldLeft + 1) % FIELD_COUNT;
-            nextField = s.swimFieldLeft;
-        } else if (id == :swim_r) {
-            s.swimFieldRight = (s.swimFieldRight + 1) % FIELD_COUNT;
-            nextField = s.swimFieldRight;
-        } else if (id == :bike_l) {
-            s.bikeFieldLeft = (s.bikeFieldLeft + 1) % FIELD_COUNT;
-            nextField = s.bikeFieldLeft;
-        } else if (id == :bike_r) {
-            s.bikeFieldRight = (s.bikeFieldRight + 1) % FIELD_COUNT;
-            nextField = s.bikeFieldRight;
-        } else if (id == :run_l) {
-            s.runFieldLeft = (s.runFieldLeft + 1) % FIELD_COUNT;
-            nextField = s.runFieldLeft;
-        } else if (id == :run_r) {
-            s.runFieldRight = (s.runFieldRight + 1) % FIELD_COUNT;
-            nextField = s.runFieldRight;
-        }
-        s.save();
-        item.setSubLabel(SportDefinitions.getFieldLabel(nextField));
+        var cat = 2;
+        if (id == :edit_swim) { cat = 0; }
+        else if (id == :edit_bike) { cat = 1; }
+        var edView = new DataScreenEditorView(manager, cat);
+        WatchUi.pushView(edView, new DataScreenEditorDelegate(manager, edView), WatchUi.SLIDE_LEFT);
     }
 
     function onBack() as Void {

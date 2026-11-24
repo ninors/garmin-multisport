@@ -34,6 +34,7 @@ module SportDefinitions {
     const FIELD_LAP_DIST = 10;
     const FIELD_TOTAL_TIME = 11;
     const FIELD_SWOLF = 12;
+    const FIELD_CHRONO = 13;
 
     function getSportName(sport as Number) as String {
         switch (sport) {
@@ -178,6 +179,7 @@ module SportDefinitions {
             case FIELD_LAP_DIST: return "DIST TOUR";
             case FIELD_TOTAL_TIME: return "TPS TOTAL";
             case FIELD_SWOLF: return "SWOLF";
+            case FIELD_CHRONO: return "CHRONO";
             default: return "DONNÉE";
         }
     }

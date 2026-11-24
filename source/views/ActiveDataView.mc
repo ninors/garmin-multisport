@@ -137,12 +137,19 @@ class ActiveDataView extends WatchUi.View {
         var sport = seg.sportType;
         var sportColor = SportDefinitions.getSportColor(sport);
 
-        // Top: Material SVG sport icon + "CHRONO" + Huge Superscript Chrono
+        // Top: Material SVG sport icon + customizable Top field (default CHRONO)
+        var topField = manager.settings.getFieldTopForSport(sport);
+        var topLabel = getDynamicFieldLabel(topField, seg);
         SportIcons.drawSportIcon(dc, sport, cx - 64, 36, 14, sportColor);
         dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 10, 36, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx + 10, 36, Graphics.FONT_XTINY, topLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 84, Theme.COLOR_WHITE);
+        if (topField == SportDefinitions.FIELD_CHRONO) {
+            GarminComponents.drawSuperscriptChrono(dc, seg.elapsedMs, cx, 84, Theme.COLOR_WHITE);
+        } else {
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, 84, Graphics.FONT_NUMBER_MEDIUM, manager.getFormattedFieldValue(topField), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
 
         // Signature FR965 Thin Red Dividers (#FF0033)
         dc.setColor(Theme.COLOR_RED_DIVIDER, Graphics.COLOR_TRANSPARENT);
@@ -279,7 +286,7 @@ class ActiveDataView extends WatchUi.View {
         dc.setPenWidth(2);
         dc.drawLine(46, 126, w - 46, 126);
 
-        // Clean leg rows centered inside circular safe zone (y = 148..324)
+        // Clean leg rows centered inside circular safe zone (y = 148..324) — ZERO overlap!
         var maxRows = (manager.segments.size() > 5) ? 5 : manager.segments.size();
         var startY = 148;
         var rowH = 42;
@@ -291,27 +298,42 @@ class ActiveDataView extends WatchUi.View {
             var textColor = isCur ? sColor : (s.completed ? Theme.COLOR_WHITE : Theme.COLOR_DIM);
 
             // Crisp Material SVG icon
-            SportIcons.drawSportIcon(dc, s.sportType, 74, y, 12, sColor);
+            SportIcons.drawSportIcon(dc, s.sportType, 62, y, 12, sColor);
 
-            // Sport name
+            // Compact sport label (max 4 chars so time & dist never collide!)
+            var shortLbl = getCompactLegLabel(s.sportType);
             dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(100, y, Graphics.FONT_XTINY, SportDefinitions.getSportShortName(s.sportType), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(84, y, Graphics.FONT_XTINY, shortLbl, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-            // Leg elapsed time
+            // Leg elapsed time (right-aligned at x = 228)
             var tStr = (s.completed || isCur) ? SportDefinitions.formatTime(s.elapsedMs) : "--:--";
-            dc.drawText(246, y, Graphics.FONT_XTINY, tStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(228, y, Graphics.FONT_XTINY, tStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
 
-            // Leg distance (clean with unit)
+            // Leg distance (right-aligned at x = 328, plenty of breathing room!)
             if (!SportDefinitions.isTransition(s.sportType)) {
                 var u = SportDefinitions.getDistanceUnit(s.distanceMeters, SportDefinitions.isSwim(s.sportType));
-                var dStr = SportDefinitions.formatDistance(s.distanceMeters, SportDefinitions.isSwim(s.sportType)) + u;
+                var dStr = SportDefinitions.formatDistance(s.distanceMeters, SportDefinitions.isSwim(s.sportType)) + (u.equals("m") ? "m" : "");
                 dc.setColor(isCur ? Theme.COLOR_WHITE : Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(324, y, Graphics.FONT_XTINY, dStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.drawText(328, y, Graphics.FONT_XTINY, dStr, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
     }
 
-    // PAGE 3: Clean Live GPS Track Map on Pure Black
+    private function getCompactLegLabel(sport as Number) as String {
+        switch (sport) {
+            case SportDefinitions.SPORT_SWIM_OPEN:
+            case SportDefinitions.SPORT_SWIM_POOL: return "Nage";
+            case SportDefinitions.SPORT_TRANSITION_1: return "T1";
+            case SportDefinitions.SPORT_BIKE: return "Vélo";
+            case SportDefinitions.SPORT_TRANSITION_2: return "T2";
+            case SportDefinitions.SPORT_RUN: return "Run";
+            case SportDefinitions.SPORT_TRAIL: return "Trail";
+            case SportDefinitions.SPORT_WALK: return "Marc.";
+            default: return "Card.";
+        }
+    }
+
+    // PAGE 3: Multi-Colored Live GPS Track Map (Blue=Swim, Yellow=Trans, Green=Bike, Red=Run)
     private function drawPage3GpsTrack(dc as Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
@@ -347,39 +369,63 @@ class ActiveDataView extends WatchUi.View {
             }
             var midLat = (minLat + maxLat) / 2.0f;
             var midLon = (minLon + maxLon) / 2.0f;
-            var scale = 200.0f / maxSpan;
+            var scale = 196.0f / maxSpan;
 
             var prevX = cx + ((manager.trackLons[0] - midLon) * scale).toNumber();
             var prevY = cy - ((manager.trackLats[0] - midLat) * scale).toNumber();
             dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
             dc.fillCircle(prevX, prevY, 5);
 
-            dc.setColor(SportDefinitions.getSportColor(manager.getCurrentSport()), Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(4);
             for (var j = 1; j < count; j++) {
                 var px = cx + ((manager.trackLons[j] - midLon) * scale).toNumber();
                 var py = cy - ((manager.trackLats[j] - midLat) * scale).toNumber();
+                var ptSport = (j < manager.trackSports.size()) ? manager.trackSports[j] : manager.getCurrentSport();
+                dc.setColor(getTrackColorForSport(ptSport), Graphics.COLOR_TRANSPARENT);
                 dc.drawLine(prevX, prevY, px, py);
                 prevX = px;
                 prevY = py;
             }
             drawHeadingArrow(dc, prevX, prevY, manager.heading);
 
-            var metersPerPx = (maxSpan * 111000.0f) / 200.0f;
-            var barMeters = (metersPerPx * 56.0f).toNumber();
+            // Dynamic scale bar
+            var metersPerPx = (maxSpan * 111000.0f) / 196.0f;
+            var barMeters = (metersPerPx * 52.0f).toNumber();
             if (barMeters < 10) { barMeters = 10; }
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(2);
-            dc.drawLine(cx - 28, 344, cx + 28, 344);
-            dc.drawLine(cx - 28, 339, cx - 28, 349);
-            dc.drawLine(cx + 28, 339, cx + 28, 349);
-            dc.drawText(cx, 326, Graphics.FONT_XTINY, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawLine(cx - 26, 326, cx + 26, 326);
+            dc.drawText(cx, 312, Graphics.FONT_XTINY, barMeters.toString() + " m", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
             drawHeadingArrow(dc, cx, cy, manager.heading);
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            var gpsText = (manager.gpsQuality >= Position.QUALITY_POOR) ? "TRACÉ GPS" : "RECHERCHE GPS";
-            dc.drawText(cx, 340, Graphics.FONT_XTINY, gpsText, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+
+        // Compact color legend at bottom: Blue Swim • Green Bike • Red Run
+        dc.setColor(0x00AAFF, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx - 72, 354, 4);
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx - 64, 354, Graphics.FONT_XTINY, "Nage", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        dc.setColor(0x00DD55, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx - 12, 354, 4);
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx - 4, 354, Graphics.FONT_XTINY, "Vélo", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        dc.setColor(0xFF2233, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx + 42, 354, 4);
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx + 50, 354, Graphics.FONT_XTINY, "Run", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    private function getTrackColorForSport(sport as Number) as Number {
+        if (SportDefinitions.isSwim(sport)) {
+            return 0x00AAFF; // Blue for Swim
+        } else if (SportDefinitions.isBike(sport)) {
+            return 0x00DD55; // Green for Bike
+        } else if (SportDefinitions.isTransition(sport)) {
+            return 0xFFCC00; // Yellow for Transition
+        }
+        return 0xFF2233; // Red for Run
     }
 
     private function drawHeadingArrow(dc as Dc, x as Number, y as Number, headingRad as Float) as Void {

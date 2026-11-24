@@ -6,14 +6,12 @@ module PauseMenu {
     function push(manager as MultisportManager) as Void {
         var menu = new WatchUi.Menu2({:title => "PAUSE"});
         menu.addItem(new WatchUi.MenuItem("Reprendre", SportDefinitions.getSportName(manager.getCurrentSport()), :resume, null));
+        menu.addItem(new WatchUi.MenuItem("Enregistrer", SportDefinitions.formatTime(manager.totalElapsedMs), :save, null));
 
         var nextSport = manager.getNextSport();
-        var nextSub = (nextSport != null) ? SportDefinitions.getSportName(nextSport as Number) : "Terminer";
-        menu.addItem(new WatchUi.MenuItem("Sport suivant", nextSub, :next_sport, null));
-
-        menu.addItem(new WatchUi.MenuItem("Enregistrer", SportDefinitions.formatTime(manager.totalElapsedMs), :save, null));
-        menu.addItem(new WatchUi.MenuItem("Tours", "Marquer un tour", :lap, null));
-        menu.addItem(new WatchUi.MenuItem("Paramètres", "Profil, alertes, GPS", :settings, null));
+        if (nextSport != null) {
+            menu.addItem(new WatchUi.MenuItem("Sport suivant", SportDefinitions.getSportName(nextSport as Number), :next_sport, null));
+        }
         menu.addItem(new WatchUi.MenuItem("Ignorer", "Supprimer l'activité", :discard, null));
 
         WatchUi.pushView(menu, new PauseMenuDelegate(manager), WatchUi.SLIDE_LEFT);
