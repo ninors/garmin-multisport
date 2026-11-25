@@ -8,7 +8,7 @@ import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
 
 class ActiveDataView extends WatchUi.View {
-    public static const TOTAL_PAGES = 6;
+    public static const TOTAL_PAGES = 8;
     private var manager as MultisportManager;
     public var currentPage as Number;
     private var dotsVisibleUntilTick as Number;
@@ -56,10 +56,14 @@ class ActiveDataView extends WatchUi.View {
         } else if (currentPage == 1) {
             drawPage1SegmentDetail(dc);
         } else if (currentPage == 2) {
-            drawPage2MultisportRecap(dc);
+            drawPageHrZoneGauge(dc);
         } else if (currentPage == 3) {
-            drawPage3GpsTrack(dc);
+            drawPageCadenceDynamics(dc);
         } else if (currentPage == 4) {
+            drawPage2MultisportRecap(dc);
+        } else if (currentPage == 5) {
+            drawPage3GpsTrack(dc);
+        } else if (currentPage == 6) {
             drawPage4ElevationProfile(dc);
         } else {
             drawPage5ClockBattery(dc);
@@ -303,7 +307,179 @@ class ActiveDataView extends WatchUi.View {
         dc.drawText(cx, 338, Graphics.FONT_XTINY, "TOUR : " + lapTime, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // PAGE 2: Clean Native Garmin Multisport Total Recap (safe circular margins, zero clipping!)
+    // PAGE 2: EXACT Forerunner 165 Full-Screen HR Zone Gauge (IMG_0469)
+    // Huge 240° 5-zone circular arc + thick active zone + radial white needle + Colored Heart + HUGE BPM + Zone Name
+    private function drawPageHrZoneGauge(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var cx = w / 2;
+        var cy = dc.getHeight() / 2;
+        var hr = manager.heartRate;
+        var hasHr = (hr > 30);
+        var inZone = (hasHr && hr >= manager.hrZones[0]);
+        var zIdx = manager.getHrZoneIndex(hr);
+        var zPos = manager.getHrZonePosition(hr);
+
+        // Authentic FR165 5-Zone Palette (Steel Blue -> Cyan -> Green -> Orange -> Magenta-Red)
+        var fr165ZoneColors = [0x5B92E5, 0x00D4FF, 0x00E64D, 0xFF9900, 0xFF0055] as Array<Number>;
+        var radius = cx - 24;
+        var startDeg = 205.0f; // Bottom-left
+        var totalSpan = 230.0f; // Sweeps clockwise over 12 o'clock to -25° (335°)
+        var segSpan = totalSpan / 5.0f;
+        var gap = 3.0f;
+
+        for (var i = 0; i < 5; i++) {
+            var a1 = (startDeg - (i * segSpan)).toNumber();
+            var a2 = (startDeg - ((i + 1) * segSpan) + gap).toNumber();
+            if (a1 < 0) { a1 += 360; }
+            if (a2 < 0) { a2 += 360; }
+            dc.setColor(fr165ZoneColors[i], Graphics.COLOR_TRANSPARENT);
+            if (inZone && i == zIdx) {
+                dc.setPenWidth(18);
+                dc.drawArc(cx, cy, radius - 2, Graphics.ARC_CLOCKWISE, a1, a2);
+            } else if (!inZone && i == 0) {
+                // Slightly emphasized Z1 base when below zone, matching IMG_0469
+                dc.setPenWidth(14);
+                dc.drawArc(cx, cy, radius - 1, Graphics.ARC_CLOCKWISE, a1, a2);
+            } else {
+                dc.setPenWidth(9);
+                dc.drawArc(cx, cy, radius, Graphics.ARC_CLOCKWISE, a1, a2);
+            }
+        }
+
+        // Crisp white radial pointer needle on the arc
+        if (hasHr) {
+            var needleDeg = startDeg - ((zPos / 5.0f) * totalSpan);
+            var rad = needleDeg * Math.PI / 180.0d;
+            var cosA = Math.cos(rad);
+            var sinA = Math.sin(rad);
+            var xIn = cx + (cosA * (radius - 16)).toNumber();
+            var yIn = cy - (sinA * (radius - 16)).toNumber();
+            var xOut = cx + (cosA * (radius + 10)).toNumber();
+            var yOut = cy - (sinA * (radius + 10)).toNumber();
+            dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(7);
+            dc.drawLine(xIn, yIn, xOut, yOut);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(4);
+            dc.drawLine(xIn, yIn, xOut, yOut);
+        }
+
+        // Colored Heart icon above center
+        var heartCol = inZone ? fr165ZoneColors[zIdx] : 0x5B92E5;
+        SportIcons.drawHeart(dc, cx, 114, 24, heartCol);
+
+        // HUGE centered white HR value
+        var hrStr = hasHr ? hr.toString() : "--";
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 198, Graphics.FONT_NUMBER_THAI_HOT, hrStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // French Zone Label below BPM
+        var zLabel = "Pas de zone";
+        if (inZone) {
+            if (zIdx == 0) { zLabel = "Zone 1 · Échauff."; }
+            else if (zIdx == 1) { zLabel = "Zone 2 · Facile"; }
+            else if (zIdx == 2) { zLabel = "Zone 3 · Aérobie"; }
+            else if (zIdx == 3) { zLabel = "Zone 4 · Seuil"; }
+            else { zLabel = "Zone 5 · Maximum"; }
+        }
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 276, Graphics.FONT_TINY, zLabel, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // PAGE 3: EXACT Forerunner 165 Running Dynamics & Cadence Screen (IMG_0468)
+    // 3 stacked sections with cyan-blue faded dividers + 5-color bottom Cadence Gauge (Red->Orange->Green->Blue->Purple)
+    private function drawPageCadenceDynamics(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var cx = w / 2;
+        var cy = dc.getHeight() / 2;
+        var cad = manager.cadence;
+        var spd = manager.speedMps;
+
+        // Top section: TPS CONT. SOL (estimated GCT when running, "--" at rest like IMG_0468)
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 54, Graphics.FONT_XTINY, "TPS CONT. SOL", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var gctStr = "--";
+        if (cad >= 120 && spd > 1.0f) {
+            var estGct = (440 - cad).toNumber();
+            if (estGct < 175) { estGct = 175; }
+            if (estGct > 320) { estGct = 320; }
+            gctStr = estGct.toString() + " ms";
+        }
+        dc.drawText(cx, 98, Graphics.FONT_MEDIUM, gctStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // 2 crisp cyan-blue faded horizontal divider lines (exact IMG_0468!)
+        GarminComponents.drawFadedHorizontalLine(dc, 134, 24, w - 24, 0x00CCFF, 0x006699, 0x002233);
+        GarminComponents.drawFadedHorizontalLine(dc, 260, 24, w - 24, 0x00CCFF, 0x006699, 0x002233);
+
+        // Middle section: CADENCE + HUGE white number
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 156, Graphics.FONT_XTINY, "CADENCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 212, Graphics.FONT_NUMBER_THAI_HOT, cad.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Bottom section: Runner icon + Stride length ("--" when stopped, "1.14 m" when moving)
+        var strideStr = "--";
+        if (cad > 30 && spd > 0.3f) {
+            var strideM = (spd * 60.0f) / cad.toFloat();
+            if (strideM > 0.2f && strideM < 3.0f) {
+                strideStr = strideM.format("%.2f") + " m";
+            }
+        }
+        var sw = dc.getTextWidthInPixels(strideStr, Graphics.FONT_SMALL);
+        var sStartX = cx - ((32 + sw) / 2);
+        SportIcons.drawSportIcon(dc, manager.getCurrentSport(), sStartX + 12, 294, 13, Theme.COLOR_WHITE);
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(sStartX + 30, 294, Graphics.FONT_SMALL, strideStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Bottom 5-segment colored Cadence Gauge Arc: Red -> Orange -> Green -> Blue -> Purple (IMG_0468!)
+        var cadColors = [0xFF2233, 0xFF9900, 0x00E64D, 0x0088FF, 0x7733FF] as Array<Number>;
+        var radius = cx - 14;
+        var startDeg = 216.0f;
+        var totalSpan = 108.0f;
+        var segSpan = totalSpan / 5.0f;
+        var gap = 2.4f;
+
+        var cadZone = -1;
+        var cadPos = 0.0f;
+        if (cad > 0) {
+            if (cad < 153) { cadZone = 0; cadPos = 0.5f; }
+            else if (cad < 164) { cadZone = 1; cadPos = 1.0f + ((cad - 153).toFloat() / 11.0f); }
+            else if (cad < 174) { cadZone = 2; cadPos = 2.0f + ((cad - 164).toFloat() / 10.0f); }
+            else if (cad < 184) { cadZone = 3; cadPos = 3.0f + ((cad - 174).toFloat() / 10.0f); }
+            else { cadZone = 4; cadPos = 4.6f; }
+        }
+
+        for (var i = 0; i < 5; i++) {
+            var a1 = (startDeg + (i * segSpan)).toNumber();
+            var a2 = (startDeg + ((i + 1) * segSpan) - gap).toNumber();
+            dc.setColor(cadColors[i], Graphics.COLOR_TRANSPARENT);
+            if (i == cadZone) {
+                dc.setPenWidth(16);
+                dc.drawArc(cx, cy, radius - 2, Graphics.ARC_COUNTER_CLOCKWISE, a1, a2);
+            } else {
+                dc.setPenWidth(9);
+                dc.drawArc(cx, cy, radius, Graphics.ARC_COUNTER_CLOCKWISE, a1, a2);
+            }
+        }
+
+        if (cad > 0) {
+            var tickDeg = startDeg + ((cadPos / 5.0f) * totalSpan);
+            var rad = tickDeg * Math.PI / 180.0d;
+            var cosA = Math.cos(rad);
+            var sinA = Math.sin(rad);
+            var xIn = cx + (cosA * (radius - 12)).toNumber();
+            var yIn = cy - (sinA * (radius - 12)).toNumber();
+            var xOut = cx + (cosA * (radius + 8)).toNumber();
+            var yOut = cy - (sinA * (radius + 8)).toNumber();
+            dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(6);
+            dc.drawLine(xIn, yIn, xOut, yOut);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(3);
+            dc.drawLine(xIn, yIn, xOut, yOut);
+        }
+    }
+
+    // PAGE 4: Clean Native Garmin Multisport Total Recap (safe circular margins, zero clipping!)
     private function drawPage2MultisportRecap(dc as Dc) as Void {
         var w = dc.getWidth();
         var cx = w / 2;
