@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-25T20:06:27.445076+00:00",
+  "updatedAt": "2026-11-25T20:07:51.537296+00:00",
   "totalCount": 40,
   "activities": [
     {
@@ -12,6 +12,21 @@
       "durationSec": 11,
       "distanceMeters": 0.0,
       "avgHr": 63,
+      "maxHr": 64,
+      "calories": 0,
+      "elevationGain": 0.0,
+      "load": 0
+    },
+    {
+      "id": "25199176972",
+      "name": "Multisport",
+      "typeKey": "multi_sport",
+      "category": "multisport",
+      "startTimeLocal": "2026-11-25 20:58:16",
+      "startTimeGMT": "2026-11-25 19:58:16",
+      "durationSec": 11,
+      "distanceMeters": 0.0,
+      "avgHr": 0,
       "maxHr": 64,
       "calories": 0,
       "elevationGain": 0.0,
@@ -586,21 +601,6 @@
       "calories": 444,
       "elevationGain": 293.0,
       "load": 56
-    },
-    {
-      "id": "23884249298",
-      "name": "Méditation",
-      "typeKey": "meditation",
-      "category": "other",
-      "startTimeLocal": "2026-08-07 00:03:56",
-      "startTimeGMT": "2026-08-06 22:03:56",
-      "durationSec": 600,
-      "distanceMeters": 0.0,
-      "avgHr": 57,
-      "maxHr": 72,
-      "calories": 0,
-      "elevationGain": 0.0,
-      "load": 7
     }
   ]
 }
