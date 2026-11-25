@@ -62,48 +62,51 @@ class PauseMenuView extends WatchUi.View {
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var rowH = 66;
+        var rowH = 58;
         var centerRowY = (selectedIdx == 0) ? 196 : cy;
 
-        // Draw scrollable rows relative to selectedIdx
+        // Draw scrollable rows cleanly INSIDE the red ring (zero text touching the red ring!)
         for (var i = 0; i < items.size(); i++) {
             var ry = centerRowY + ((i - selectedIdx) * rowH);
-            if (ry < 36 || ry > h - 36) {
+            if (ry < 58 || ry > h - 54) {
                 continue;
             }
             var isSel = (i == selectedIdx);
             if (isSel) {
                 // Signature FR965 navy-blue selection bar + bright cyan left vertical accent
                 dc.setColor(0x0B2344, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(26, ry - 30, w - 52, 60);
+                dc.fillRectangle(38, ry - 26, w - 76, 52);
                 dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(26, ry - 30, 5, 60);
+                dc.fillRectangle(38, ry - 26, 5, 52);
             }
 
-            drawPauseItemIcon(dc, items[i], 76, ry);
+            drawPauseItemIcon(dc, items[i], 82, ry);
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(114, ry, Graphics.FONT_SMALL, labels[i], Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(114, ry, Graphics.FONT_TINY, labels[i], Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
         // Top CHRONO + Elapsed Time header when at top of list (exact Photo 8!)
         if (selectedIdx == 0) {
             dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(0, 0, w, 152);
+            dc.fillRectangle(0, 0, w, 150);
             dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, 54, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
             var tStr = SportDefinitions.formatTime(manager.totalElapsedMs);
-            var tw = dc.getTextWidthInPixels(tStr, Graphics.FONT_NUMBER_HOT);
+            var tw = dc.getTextWidthInPixels(tStr, Graphics.FONT_NUMBER_MEDIUM);
             var leftX = cx - (tw / 2) - 8;
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(leftX, 108, Graphics.FONT_NUMBER_HOT, tStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(leftX, 104, Graphics.FONT_NUMBER_MEDIUM, tStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             var hundredths = ((manager.totalElapsedMs % 1000) / 10).format("%02d");
-            dc.drawText(leftX + tw + 3, 92, Graphics.FONT_XTINY, hundredths, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(leftX + tw + 3, 90, Graphics.FONT_XTINY, hundredths, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // Signature Forerunner 965 Continuous Red Bezel Ring (drawn ON TOP!)
+        // Clean black outer rim mask + Signature Forerunner 965 Continuous Red Bezel Ring right at the edge!
+        dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(12);
+        dc.drawCircle(cx, cy, cx - 2);
         dc.setColor(0xFF0022, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(8);
+        dc.setPenWidth(7);
         dc.drawCircle(cx, cy, cx - 10);
     }
 
