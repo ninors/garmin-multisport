@@ -2,215 +2,80 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// EXACT Forerunner 965 Native Pause Screen:
-// Thick red ring around bezel, CHRONO + 1:18⁹⁸ header, scrollable list with
-// Garmin deep-blue highlight row + cyan left accent bar + white vector icons!
+// Native Garmin Menu2 Pause Screen (exact same native selection highlight & smooth scrolling as Settings!)
+// Includes cycling Pause Header Drawable (CHRONO -> DISTANCE -> FC -> CALORIES every 3 seconds)
 module PauseMenu {
     function push(manager as MultisportManager) as Void {
-        var view = new PauseMenuView(manager);
-        WatchUi.pushView(view, new PauseMenuDelegate(manager, view), WatchUi.SLIDE_IMMEDIATE);
+        var menu = new WatchUi.Menu2({:title => new PauseHeaderDrawable(manager)});
+        menu.addItem(new WatchUi.MenuItem("Reprendre", SportDefinitions.getSportName(manager.getCurrentSport()), :resume, null));
+        menu.addItem(new WatchUi.MenuItem("Enregistrer", SportDefinitions.formatTime(manager.totalElapsedMs), :save, null));
+        if (manager.getNextSport() != null) {
+            menu.addItem(new WatchUi.MenuItem("Sport suivant", SportDefinitions.getSportName(manager.getNextSport() as Number), :next_sport, null));
+        }
+        menu.addItem(new WatchUi.MenuItem("FC récupération", (manager.heartRate > 30) ? (manager.heartRate.toString() + " bpm") : "--", :rec_hr, null));
+        menu.addItem(new WatchUi.MenuItem("Ignorer", "Supprimer l'activité", :discard, null));
+
+        WatchUi.pushView(menu, new PauseMenuDelegate(manager), WatchUi.SLIDE_UP);
     }
 }
 
-class PauseMenuView extends WatchUi.View {
+// Native Menu2 Header that cycles every 3 seconds: CHRONO -> DISTANCE -> FC -> CALORIES
+class PauseHeaderDrawable extends WatchUi.Drawable {
     private var manager as MultisportManager;
-    public var items as Array<Symbol>;
-    public var labels as Array<String>;
-    public var selectedIdx as Number;
 
     function initialize(mgr as MultisportManager) {
-        View.initialize();
+        Drawable.initialize({});
         manager = mgr;
-        selectedIdx = 0;
-        items = [:resume, :save] as Array<Symbol>;
-        labels = ["Reprendre", "Enregistrer"] as Array<String>;
-        if (mgr.getNextSport() != null) {
-            items.add(:next_sport);
-            labels.add("Sport suivant");
-        }
-        items.add(:rec_hr);
-        labels.add("FC récupération");
-        items.add(:discard);
-        labels.add("Ignorer");
     }
 
-    public function moveDown() as Void {
-        if (selectedIdx < items.size() - 1) {
-            selectedIdx++;
-            WatchUi.requestUpdate();
-        }
-    }
-
-    public function moveUp() as Void {
-        if (selectedIdx > 0) {
-            selectedIdx--;
-            WatchUi.requestUpdate();
-        }
-    }
-
-    public function getSelectedId() as Symbol {
-        return items[selectedIdx];
-    }
-
-    function onUpdate(dc as Dc) as Void {
-        Theme.enableAA(dc);
-        var w = dc.getWidth();
+    function draw(dc as Dc) as Void {
+        var cx = dc.getWidth() / 2;
         var h = dc.getHeight();
-        var cx = w / 2;
-        var cy = h / 2;
+        var slot = (manager.tickCount / 3) % 4;
 
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var rowH = 58;
-        var centerRowY = (selectedIdx == 0) ? 196 : cy;
-
-        // Draw scrollable rows cleanly INSIDE the red ring (zero text touching the red ring!)
-        for (var i = 0; i < items.size(); i++) {
-            var ry = centerRowY + ((i - selectedIdx) * rowH);
-            if (ry < 58 || ry > h - 54) {
-                continue;
-            }
-            var isSel = (i == selectedIdx);
-            if (isSel) {
-                // Signature FR965 navy-blue selection bar + bright cyan left vertical accent
-                dc.setColor(0x0B2344, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(38, ry - 26, w - 76, 52);
-                dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(38, ry - 26, 5, 52);
-            }
-
-            drawPauseItemIcon(dc, items[i], 82, ry);
+        if (slot == 0) {
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h / 3, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(114, ry, Graphics.FONT_TINY, labels[i], Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-
-        // Top cycling info header every 3 seconds when at top of list (CHRONO -> DISTANCE -> FC -> CALORIES)
-        if (selectedIdx == 0) {
-            dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(0, 0, w, 150);
-
-            var slot = (manager.tickCount / 3) % 4;
-            if (slot == 0) {
-                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 54, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                var tStr = SportDefinitions.formatTime(manager.totalElapsedMs);
-                var tw = dc.getTextWidthInPixels(tStr, Graphics.FONT_NUMBER_MEDIUM);
-                var leftX = cx - (tw / 2) - 8;
-                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(leftX, 104, Graphics.FONT_NUMBER_MEDIUM, tStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-                var hundredths = ((manager.totalElapsedMs % 1000) / 10).format("%02d");
-                dc.drawText(leftX + tw + 3, 90, Graphics.FONT_XTINY, hundredths, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            } else if (slot == 1) {
-                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 54, Graphics.FONT_XTINY, "DISTANCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 104, Graphics.FONT_NUMBER_MILD, SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            } else if (slot == 2) {
-                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 54, Graphics.FONT_XTINY, "FRÉQ. CARD.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                var hrStr = (manager.heartRate > 30) ? manager.heartRate.toString() : "--";
-                var hw = dc.getTextWidthInPixels(hrStr, Graphics.FONT_NUMBER_MILD);
-                var hx = cx - ((28 + hw) / 2);
-                SportIcons.drawHeart(dc, hx + 10, 104, 18, Theme.COLOR_HEART_RED);
-                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(hx + 28, 104, Graphics.FONT_NUMBER_MILD, hrStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            } else {
-                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 54, Graphics.FONT_XTINY, "CALORIES", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, 104, Graphics.FONT_NUMBER_MILD, manager.totalCalories.toString() + " kcal", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            }
-        }
-
-        // Clean black outer rim mask + Signature Forerunner 965 Continuous Red Bezel Ring right at the edge!
-        dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(12);
-        dc.drawCircle(cx, cy, cx - 2);
-        dc.setColor(0xFF0022, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(7);
-        dc.drawCircle(cx, cy, cx - 10);
-    }
-
-    private function drawPauseItemIcon(dc as Dc, id as Symbol, x as Number, y as Number) as Void {
-        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        if (id == :resume) {
-            // Crisp Play Triangle
-            var tri = [[x - 8, y - 12], [x + 12, y], [x - 8, y + 12]] as Array<[Numeric, Numeric]>;
-            dc.fillPolygon(tri);
-        } else if (id == :save) {
-            // Crisp Download / Save arrow
-            dc.fillRectangle(x - 3, y - 12, 6, 12);
-            var arr = [[x - 10, y - 1], [x + 10, y - 1], [x, y + 9]] as Array<[Numeric, Numeric]>;
-            dc.fillPolygon(arr);
-            dc.fillRectangle(x - 11, y + 11, 22, 3);
-        } else if (id == :next_sport) {
-            // Forward skip icon
-            var t1 = [[x - 10, y - 10], [x + 4, y], [x - 10, y + 10]] as Array<[Numeric, Numeric]>;
-            dc.fillPolygon(t1);
-            dc.fillRectangle(x + 6, y - 10, 4, 20);
-        } else if (id == :rec_hr) {
-            // Crisp White Heart icon (Photo 1!)
-            SportIcons.drawHeart(dc, x, y, 18, Theme.COLOR_WHITE);
-        } else if (id == :discard) {
-            // Crisp White Trash Can icon (Photo 1!)
-            dc.fillRectangle(x - 10, y - 10, 20, 3);
-            dc.fillRectangle(x - 4, y - 14, 8, 4);
-            dc.fillRoundedRectangle(x - 8, y - 5, 16, 18, 2);
+            dc.drawText(cx, (h * 3) / 4, Graphics.FONT_MEDIUM, SportDefinitions.formatTime(manager.totalElapsedMs), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (slot == 1) {
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h / 3, Graphics.FONT_XTINY, "DISTANCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, (h * 3) / 4, Graphics.FONT_MEDIUM, SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (slot == 2) {
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h / 3, Graphics.FONT_XTINY, "FRÉQ. CARD.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_HEART_RED, Graphics.COLOR_TRANSPARENT);
+            var hrStr = (manager.heartRate > 30) ? (manager.heartRate.toString() + " bpm") : "--";
+            dc.drawText(cx, (h * 3) / 4, Graphics.FONT_MEDIUM, hrStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h / 3, Graphics.FONT_XTINY, "CALORIES", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, (h * 3) / 4, Graphics.FONT_MEDIUM, manager.totalCalories.toString() + " kcal", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }
 }
 
-class PauseMenuDelegate extends WatchUi.InputDelegate {
+class PauseMenuDelegate extends WatchUi.Menu2InputDelegate {
     private var manager as MultisportManager;
-    private var view as PauseMenuView;
 
-    function initialize(mgr as MultisportManager, v as PauseMenuView) {
-        InputDelegate.initialize();
+    function initialize(mgr as MultisportManager) {
+        Menu2InputDelegate.initialize();
         manager = mgr;
-        view = v;
     }
 
-    function onKey(evt as WatchUi.KeyEvent) as Boolean {
-        var k = evt.getKey();
-        if (k == WatchUi.KEY_DOWN) {
-            view.moveDown();
-            return true;
-        } else if (k == WatchUi.KEY_UP) {
-            view.moveUp();
-            return true;
-        } else if (k == WatchUi.KEY_ESC) {
-            if (manager.state == MultisportManager.STATE_PAUSED) {
-                manager.togglePause();
-            }
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            return true;
-        } else if (k == WatchUi.KEY_ENTER) {
-            return handleSelect(view.getSelectedId());
-        }
-        return false;
-    }
-
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
-        return true;
-    }
-
-    function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
-        var dir = evt.getDirection();
-        if (dir == WatchUi.SWIPE_UP) {
-            view.moveDown();
-        } else if (dir == WatchUi.SWIPE_DOWN) {
-            view.moveUp();
-        }
-        return true;
-    }
-
-    private function handleSelect(id as Symbol) as Boolean {
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
         if (id == :resume) {
             if (manager.state == MultisportManager.STATE_PAUSED) {
                 manager.togglePause();
             }
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
         } else if (id == :next_sport) {
             var finished = manager.nextSegment();
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
@@ -224,15 +89,21 @@ class PauseMenuDelegate extends WatchUi.InputDelegate {
             var evalView = new FeelEvalView(manager);
             WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
         } else if (id == :rec_hr) {
-            // Open dedicated full-screen Recovery HR page (live heart + BPM + 5-zone colored arc)
             var recView = new RecoveryHRView(manager);
             WatchUi.pushView(recView, new RecoveryHRDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id == :discard) {
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            // Native Garmin Confirmation dialog (native red cross X / green check V!)
             var confirm = new WatchUi.Confirmation("Ignorer l'activité ?");
             WatchUi.pushView(confirm, new DiscardConfirmDelegate(manager), WatchUi.SLIDE_UP);
         }
-        return true;
+    }
+
+    function onBack() as Void {
+        if (manager.state == MultisportManager.STATE_PAUSED) {
+            manager.togglePause();
+        }
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 }
 
@@ -258,45 +129,20 @@ class DiscardConfirmDelegate extends WatchUi.ConfirmationDelegate {
     }
 }
 
-// Dedicated Full-Screen Garmin "FC récupération" Page (Heart + Live BPM + 2:00 countdown + 5-zone colored arc)
+// Ultra-clean Minimalist Recovery HR Page: ONLY live Heart + BPM + Bottom 5-zone colored semi-circle arc!
 class RecoveryHRView extends WatchUi.View {
     private var manager as MultisportManager;
-    private var startTick as Number;
-    private var startHr as Number;
 
     function initialize(mgr as MultisportManager) {
         View.initialize();
         manager = mgr;
-        startTick = mgr.tickCount;
-        startHr = mgr.heartRate;
     }
 
     function onUpdate(dc as Dc) as Void {
         Theme.enableAA(dc);
-        var cx = dc.getWidth() / 2;
-
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        // Top header + 2:00 Recovery countdown
-        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 54, Graphics.FONT_XTINY, "FC RÉCUPÉRATION", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        var elapsedSec = manager.tickCount - startTick;
-        var remSec = 120 - elapsedSec;
-        if (remSec < 0) { remSec = 0; }
-        var mins = remSec / 60;
-        var secs = remSec % 60;
-        dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 94, Graphics.FONT_MEDIUM, mins.toString() + ":" + secs.format("%02d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // Live HR drop delta since entering Recovery HR
-        var drop = (startHr > 30 && manager.heartRate > 30) ? (startHr - manager.heartRate) : 0;
-        var dropStr = (drop > 0) ? ("-" + drop.toString() + " bpm") : "En cours...";
-        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 148, Graphics.FONT_TINY, dropStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // Center-bottom: Exact FR965 Heart icon + Live BPM + 5-zone colored semi-circle arc!
         var zPos = manager.getHrZonePosition(manager.heartRate);
         var zIdx = manager.getHrZoneIndex(manager.heartRate);
         GarminComponents.drawBottomHrArc(dc, manager.heartRate, zPos, zIdx);

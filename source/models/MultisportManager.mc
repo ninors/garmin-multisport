@@ -334,6 +334,7 @@ class MultisportManager {
 
         currentLegIndex = 0;
         state = STATE_ACTIVE;
+        isLocked = settings.lockDeviceEnabled;
         hrZones = loadHrZonesForSport(getCurrentSport());
         startContinuousSession();
         // Vibrate only (Garmin firmware already plays the native Start tone when session.start() runs)
@@ -359,14 +360,28 @@ class MultisportManager {
         }
 
         if (currentLegIndex + 1 >= legs.size()) {
-            // Stop recording now; commitSaveWithFeel() will write the chosen smiley & save the FIT!
-            if (session != null && session.isRecording()) {
-                session.stop();
+            // If "Répéter" setting is enabled, append another full multisport cycle!
+            if (settings.repeatEnabled) {
+                var extraLegs = SportDefinitions.buildLegs(
+                    settings.profileId,
+                    settings.transitionsEnabled,
+                    settings.swimPoolMode,
+                    settings.customSports
+                );
+                for (var r = 0; r < extraLegs.size(); r++) {
+                    legs.add(extraLegs[r]);
+                    segments.add(new SegmentData(extraLegs[r]));
+                }
+            } else {
+                // Stop recording now; commitSaveWithFeel() will write the chosen smiley & save the FIT!
+                if (session != null && session.isRecording()) {
+                    session.stop();
+                }
+                state = STATE_SUMMARY;
+                triggerVibeOnly(150);
+                overlayType = OVERLAY_NONE;
+                return true;
             }
-            state = STATE_SUMMARY;
-            triggerVibeOnly(150);
-            overlayType = OVERLAY_NONE;
-            return true;
         }
 
         // Mode 1: Multi-file separate sessions (each sport saves its own .FIT + LiveTrack)
