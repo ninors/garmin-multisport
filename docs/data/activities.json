@@ -1,7 +1,22 @@
 {
-  "updatedAt": "2026-11-25T19:54:19.663294+00:00",
+  "updatedAt": "2026-11-25T20:06:27.445076+00:00",
   "totalCount": 40,
   "activities": [
+    {
+      "id": "25199077896",
+      "name": "Course à pied",
+      "typeKey": "running",
+      "category": "run",
+      "startTimeLocal": "2026-11-25 20:58:16",
+      "startTimeGMT": "2026-11-25 19:58:16",
+      "durationSec": 11,
+      "distanceMeters": 0.0,
+      "avgHr": 63,
+      "maxHr": 64,
+      "calories": 0,
+      "elevationGain": 0.0,
+      "load": 0
+    },
     {
       "id": "25145093378",
       "name": "Nat. piscine",
@@ -513,6 +528,21 @@
       "load": 0
     },
     {
+      "id": "25199033945",
+      "name": "Multisport",
+      "typeKey": "multi_sport",
+      "category": "multisport",
+      "startTimeLocal": "2026-08-28 14:50:16",
+      "startTimeGMT": "2026-08-28 12:50:16",
+      "durationSec": 26,
+      "distanceMeters": 0.0,
+      "avgHr": 0,
+      "maxHr": 104,
+      "calories": 2,
+      "elevationGain": 0.0,
+      "load": 0
+    },
+    {
       "id": "24075695081",
       "name": "Cancale Voile",
       "typeKey": "other",
@@ -571,36 +601,6 @@
       "calories": 0,
       "elevationGain": 0.0,
       "load": 7
-    },
-    {
-      "id": "23813913495",
-      "name": "Vallorcine Randonnée",
-      "typeKey": "hiking",
-      "category": "walk",
-      "startTimeLocal": "2026-08-01 13:59:04",
-      "startTimeGMT": "2026-08-01 11:59:04",
-      "durationSec": 11618,
-      "distanceMeters": 7883.1,
-      "avgHr": 105,
-      "maxHr": 152,
-      "calories": 767,
-      "elevationGain": 398.0,
-      "load": 100
-    },
-    {
-      "id": "23801773819",
-      "name": "Passy Randonnée",
-      "typeKey": "hiking",
-      "category": "walk",
-      "startTimeLocal": "2026-07-31 13:19:38",
-      "startTimeGMT": "2026-07-31 11:19:38",
-      "durationSec": 12032,
-      "distanceMeters": 7702.8,
-      "avgHr": 102,
-      "maxHr": 155,
-      "calories": 755,
-      "elevationGain": 364.0,
-      "load": 97
     }
   ]
 }
