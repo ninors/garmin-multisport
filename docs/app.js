@@ -332,8 +332,8 @@
         }
       );
       if (res.status === 204) {
-        showToast("Synchronisation lancée ! Mise à jour dans ~30 secondes.");
-        setTimeout(() => loadData(true), 35000);
+        showToast("Synchronisation Garmin lancée ! Mise à jour automatique en cours...");
+        pollWorkflowUntilDone(repo, token);
         return true;
       }
       showToast(`Erreur GitHub (${res.status}) : vérifie le jeton (scope workflow).`);
@@ -342,6 +342,28 @@
       showToast("Impossible de joindre GitHub.");
       return false;
     }
+  }
+
+  async function pollWorkflowUntilDone(repo, token) {
+    // Poll GitHub Actions every 6s (up to ~72s) and auto-refresh activities once finished
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 6000));
+      try {
+        const res = await fetch(
+          `https://api.github.com/repos/${repo}/actions/workflows/merge-multisport.yml/runs?per_page=1`,
+          { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) continue;
+        const json = await res.json();
+        const run = (json.workflow_runs || [])[0];
+        if (run && run.status === "completed") {
+          await loadData(true);
+          showToast(run.conclusion === "success" ? "Activités Garmin mises à jour !" : "Fin du workflow (vérifie GitHub Actions).");
+          return;
+        }
+      } catch (_) {}
+    }
+    await loadData(true);
   }
 
   function switchTab(tab) {
