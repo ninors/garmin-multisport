@@ -85,20 +85,42 @@ class PauseMenuView extends WatchUi.View {
             dc.drawText(114, ry, Graphics.FONT_TINY, labels[i], Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // Top CHRONO + Elapsed Time header when at top of list (exact Photo 8!)
+        // Top cycling info header every 3 seconds when at top of list (CHRONO -> DISTANCE -> FC -> CALORIES)
         if (selectedIdx == 0) {
             dc.setColor(Theme.COLOR_BG, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(0, 0, w, 150);
-            dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, 54, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-            var tStr = SportDefinitions.formatTime(manager.totalElapsedMs);
-            var tw = dc.getTextWidthInPixels(tStr, Graphics.FONT_NUMBER_MEDIUM);
-            var leftX = cx - (tw / 2) - 8;
-            dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(leftX, 104, Graphics.FONT_NUMBER_MEDIUM, tStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            var hundredths = ((manager.totalElapsedMs % 1000) / 10).format("%02d");
-            dc.drawText(leftX + tw + 3, 90, Graphics.FONT_XTINY, hundredths, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            var slot = (manager.tickCount / 3) % 4;
+            if (slot == 0) {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 54, Graphics.FONT_XTINY, "CHRONO", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                var tStr = SportDefinitions.formatTime(manager.totalElapsedMs);
+                var tw = dc.getTextWidthInPixels(tStr, Graphics.FONT_NUMBER_MEDIUM);
+                var leftX = cx - (tw / 2) - 8;
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(leftX, 104, Graphics.FONT_NUMBER_MEDIUM, tStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+                var hundredths = ((manager.totalElapsedMs % 1000) / 10).format("%02d");
+                dc.drawText(leftX + tw + 3, 90, Graphics.FONT_XTINY, hundredths, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            } else if (slot == 1) {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 54, Graphics.FONT_XTINY, "DISTANCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 104, Graphics.FONT_NUMBER_MILD, SportDefinitions.formatDistance(manager.totalDistanceMeters, false) + " km", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            } else if (slot == 2) {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 54, Graphics.FONT_XTINY, "FRÉQ. CARD.", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                var hrStr = (manager.heartRate > 30) ? manager.heartRate.toString() : "--";
+                var hw = dc.getTextWidthInPixels(hrStr, Graphics.FONT_NUMBER_MILD);
+                var hx = cx - ((28 + hw) / 2);
+                SportIcons.drawHeart(dc, hx + 10, 104, 18, Theme.COLOR_HEART_RED);
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(hx + 28, 104, Graphics.FONT_NUMBER_MILD, hrStr, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            } else {
+                dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 54, Graphics.FONT_XTINY, "CALORIES", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, 104, Graphics.FONT_NUMBER_MILD, manager.totalCalories.toString() + " kcal", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
 
         // Clean black outer rim mask + Signature Forerunner 965 Continuous Red Bezel Ring right at the edge!
@@ -202,9 +224,9 @@ class PauseMenuDelegate extends WatchUi.InputDelegate {
             var evalView = new FeelEvalView(manager);
             WatchUi.switchToView(evalView, new FeelEvalDelegate(manager, evalView), WatchUi.SLIDE_LEFT);
         } else if (id == :rec_hr) {
-            var hrText = (manager.heartRate > 30) ? (manager.heartRate.toString() + " bpm") : "-- bpm";
-            manager.showAlert("FC RÉCUPÉRATION", hrText, 3);
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            // Open dedicated full-screen Recovery HR page (live heart + BPM + 5-zone colored arc)
+            var recView = new RecoveryHRView(manager);
+            WatchUi.pushView(recView, new RecoveryHRDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id == :discard) {
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             var confirm = new WatchUi.Confirmation("Ignorer l'activité ?");
@@ -232,6 +254,70 @@ class DiscardConfirmDelegate extends WatchUi.ConfirmationDelegate {
                 manager.togglePause();
             }
         }
+        return true;
+    }
+}
+
+// Dedicated Full-Screen Garmin "FC récupération" Page (Heart + Live BPM + 2:00 countdown + 5-zone colored arc)
+class RecoveryHRView extends WatchUi.View {
+    private var manager as MultisportManager;
+    private var startTick as Number;
+    private var startHr as Number;
+
+    function initialize(mgr as MultisportManager) {
+        View.initialize();
+        manager = mgr;
+        startTick = mgr.tickCount;
+        startHr = mgr.heartRate;
+    }
+
+    function onUpdate(dc as Dc) as Void {
+        Theme.enableAA(dc);
+        var cx = dc.getWidth() / 2;
+
+        dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+        dc.clear();
+
+        // Top header + 2:00 Recovery countdown
+        dc.setColor(Theme.COLOR_LABEL, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 54, Graphics.FONT_XTINY, "FC RÉCUPÉRATION", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        var elapsedSec = manager.tickCount - startTick;
+        var remSec = 120 - elapsedSec;
+        if (remSec < 0) { remSec = 0; }
+        var mins = remSec / 60;
+        var secs = remSec % 60;
+        dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 94, Graphics.FONT_MEDIUM, mins.toString() + ":" + secs.format("%02d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Live HR drop delta since entering Recovery HR
+        var drop = (startHr > 30 && manager.heartRate > 30) ? (startHr - manager.heartRate) : 0;
+        var dropStr = (drop > 0) ? ("-" + drop.toString() + " bpm") : "En cours...";
+        dc.setColor(Theme.COLOR_GREEN_RING, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 148, Graphics.FONT_TINY, dropStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Center-bottom: Exact FR965 Heart icon + Live BPM + 5-zone colored semi-circle arc!
+        var zPos = manager.getHrZonePosition(manager.heartRate);
+        var zIdx = manager.getHrZoneIndex(manager.heartRate);
+        GarminComponents.drawBottomHrArc(dc, manager.heartRate, zPos, zIdx);
+    }
+}
+
+class RecoveryHRDelegate extends WatchUi.InputDelegate {
+    function initialize() {
+        InputDelegate.initialize();
+    }
+
+    function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_ESC || k == WatchUi.KEY_ENTER) {
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return true;
+        }
+        return false;
+    }
+
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
         return true;
     }
 }
