@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Multisport" />
+  <title>Multisport</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Clean COROS-style Light Header -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <img src="./icon.svg" alt="Multisport" class="brand-logo" />
+      <div>
+        <h1 id="pageTitle">Progression</h1>
+        <span id="syncSubtitle" class="subtitle">Chargement...</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span id="netBadge" class="net-pill online">En ligne</span>
+      <button id="btnQuickSync" class="icon-btn" title="Synchroniser Garmin Connect" aria-label="Synchroniser">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/>
+          <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/>
+          <polyline points="21 3 21 8 16 8"/>
+          <polyline points="3 21 3 16 8 16"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- TAB 1: PROGRESSION (COROS EvoLab Light Style) -->
+    <section id="tab-progress" class="tab-view active">
+      <div class="kpi-strip">
+        <div class="kpi-item">
+          <span class="kpi-label">Charge 7j</span>
+          <strong id="kpiLoad" class="kpi-value">--</strong>
+          <span id="kpiLoadStatus" class="kpi-tag">Optimale</span>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+          <span class="kpi-label">Volume 7j</span>
+          <strong id="kpiDist" class="kpi-value">--</strong>
+          <span id="kpiTime" class="kpi-sub">--</span>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+          <span class="kpi-label">Forme</span>
+          <strong id="kpiReadiness" class="kpi-value">--</strong>
+          <span id="kpiReadinessSub" class="kpi-sub">EvoLab</span>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Charge d'entraînement (7 jours)</h2>
+          <span id="weekTotalLoad" class="muted">0 pts</span>
+        </div>
+        <div id="loadChart" class="chart-wrap"></div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Répartition Multisport (30 jours)</h2>
+          <span id="monthCount" class="muted">0 séances</span>
+        </div>
+        <div id="sportSplitBar" class="split-bar"></div>
+        <div id="sportSplitLegend" class="split-legend"></div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Dernière séance</h2>
+          <button id="btnGoActivities" class="text-link">Tout voir</button>
+        </div>
+        <div id="latestActivitySlot" class="clean-list"></div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ACTIVITÉS & CONVERSION MULTISPORT -->
+    <section id="tab-activities" class="tab-view">
+      <div class="filter-row" id="filterPills">
+        <button class="pill active" data-filter="all">Toutes</button>
+        <button class="pill" data-filter="multisport">Multisport</button>
+        <button class="pill" data-filter="swim">Natation</button>
+        <button class="pill" data-filter="bike">Vélo</button>
+        <button class="pill" data-filter="run">Course</button>
+      </div>
+
+      <div class="select-hint">
+        <span>Sélectionne 1 activité (ou plusieurs à fusionner) pour l'envoyer en Multisport sur Garmin Connect.</span>
+      </div>
+
+      <div id="activitiesList" class="clean-list"></div>
+    </section>
+
+    <!-- TAB 3: COACH IA (100% HORS-LIGNE + OPTION CLOUD) -->
+    <section id="tab-coach" class="tab-view">
+      <div class="coach-hero">
+        <div class="coach-badge">Coach IA • Autonome hors-ligne</div>
+        <h2 id="coachHeadline">Analyse de ta forme en cours...</h2>
+        <p id="coachSummary" class="coach-text"></p>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Séance recommandée demain</h2>
+          <span id="coachTargetBadge" class="kpi-tag">Adaptée</span>
+        </div>
+        <p id="coachNextWorkout" class="workout-card"></p>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Questions rapides</h2>
+        </div>
+        <div class="chip-row" id="coachChips">
+          <button class="chip" data-q="semaine">Analyse ma semaine</button>
+          <button class="chip" data-q="demain">Quelle séance demain ?</button>
+          <button class="chip" data-q="triathlon">Prêt pour un Triathlon ?</button>
+          <button class="chip" data-q="equilibre">Équilibre Nage / Vélo / Run</button>
+          <button class="chip" data-q="recup">Mon état de récupération</button>
+        </div>
+        <div id="coachChatLog" class="chat-log"></div>
+        <form id="coachForm" class="chat-input-row">
+          <input id="coachInput" type="text" placeholder="Pose une question au Coach IA..." autocomplete="off" />
+          <button type="submit" class="btn-primary-sm">Envoyer</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 4: RÉGLAGES & SYNCHRO DISTANTE -->
+    <section id="tab-settings" class="tab-view">
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Synchronisation à distance (GitHub)</h2>
+        </div>
+        <p class="helper-text">
+          Pour déclencher la conversion Multisport vers Garmin Connect directement depuis l'application, colle un jeton GitHub (Personal Access Token avec permission <code>workflow</code>). Il reste stocké uniquement sur ton appareil.
+        </p>
+        <label class="field-label" for="inputGhRepo">Dépôt GitHub</label>
+        <input id="inputGhRepo" class="field-input" type="text" value="ninors/garmin-multisport" />
+
+        <label class="field-label" for="inputGhToken">Jeton GitHub (PAT)</label>
+        <input id="inputGhToken" class="field-input" type="password" placeholder="ghp_... ou github_pat_..." />
+
+        <div class="settings-actions">
+          <button id="btnSaveSettings" class="btn-primary">Enregistrer</button>
+          <button id="btnTriggerSync" class="btn-secondary">Synchroniser Garmin</button>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>État Hors-Ligne (PWA)</h2>
+          <span id="offlineCacheStatus" class="kpi-tag">Actif</span>
+        </div>
+        <p class="helper-text">
+          Tes activités, graphiques et le Coach IA sont mis en cache localement. Sur iPhone : <strong>Partager → Sur l'écran d'accueil</strong>. Sur Android / Chrome : <strong>Installer l'application</strong>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating Action Bar when 1+ activities are selected -->
+  <div id="convertBar" class="convert-bar hidden">
+    <div class="convert-bar-top">
+      <span id="convertCount">1 activité sélectionnée</span>
+      <button id="btnClearSelection" class="text-link">Annuler</button>
+    </div>
+    <div class="convert-controls">
+      <select id="selectProfile" class="profile-select" aria-label="Profil Multisport">
+        <option value="Triathlon">Triathlon</option>
+        <option value="Duathlon">Duathlon</option>
+        <option value="Swimrun">Swimrun</option>
+        <option value="Aquathlon">Aquathlon</option>
+        <option value="Multisport">Multisport Perso</option>
+      </select>
+      <button id="btnSendMultisport" class="btn-primary">Envoyer sur Garmin</button>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Clean COROS-style Bottom Navigation -->
+  <nav class="bottom-nav" aria-label="Navigation principale">
+    <button class="nav-btn active" data-tab="progress">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>
+      </svg>
+      <span>Progression</span>
+    </button>
+    <button class="nav-btn" data-tab="activities">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+        <circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>
+      </svg>
+      <span>Activités</span>
+    </button>
+    <button class="nav-btn" data-tab="coach">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2a7 7 0 0 1 7 7c0 2.6-1.4 4.8-3.5 6l-.5 3H9l-.5-3A7 7 0 0 1 12 2z"/>
+        <line x1="9" y1="21" x2="15" y2="21"/>
+      </svg>
+      <span>Coach IA</span>
+    </button>
+    <button class="nav-btn" data-tab="settings">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>Réglages</span>
+    </button>
+  </nav>
+
+  <script src="./app.js"></script>
+</body>
+</html>

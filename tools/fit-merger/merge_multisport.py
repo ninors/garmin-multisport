@@ -19,6 +19,7 @@ How it works:
 """
 
 import io
+import json
 import math
 import os
 import re
@@ -489,10 +490,261 @@ def detect_chronological_chains(activities: List[dict]) -> List[List[dict]]:
     return result
 
 
+def export_dashboard_json(activities: List[dict], output_path: Path) -> None:
+    """Export sanitized recent activities + EvoLab-style training stats for the offline PWA."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    items = []
+    for act in activities[:40]:
+        tkey = ((act.get("activityType") or {}).get("typeKey") or "other").lower()
+        cat = "multisport" if "multi_sport" in tkey else normalize_sport_category(tkey)
+        dur = float(act.get("duration") or act.get("elapsedDuration") or 0.0)
+        dist = float(act.get("distance") or 0.0)
+        avg_hr = int(act.get("averageHR") or 0)
+        max_hr = int(act.get("maxHR") or 0)
+        cals = int(act.get("calories") or 0)
+        elev = float(act.get("elevationGain") or 0.0)
+        # Estimate TRIMP-like training load (0-300) for COROS EvoLab-style fitness graph
+        intensity = max(0.35, min(1.5, (avg_hr - 60) / 100.0)) if avg_hr > 60 else 0.65
+        load = int(round((dur / 60.0) * intensity * 1.15))
+
+        items.append({
+            "id": str(act.get("activityId")),
+            "name": act.get("activityName") or "Activité",
+            "typeKey": tkey,
+            "category": cat,
+            "startTimeLocal": act.get("startTimeLocal") or act.get("startTimeGMT") or "",
+            "startTimeGMT": act.get("startTimeGMT") or "",
+            "durationSec": int(round(dur)),
+            "distanceMeters": round(dist, 1),
+            "avgHr": avg_hr,
+            "maxHr": max_hr,
+            "calories": cals,
+            "elevationGain": round(elev, 1),
+            "load": load,
+        })
+
+    payload = {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "totalCount": len(items),
+        "activities": items,
+    }
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Exported {len(items)} activities to {output_path}")
+
+
+def force_convert_single_fit_to_profile(fit_path: Path, profile_name: str, output_path: Path) -> None:
+    """
+    Convert a single continuous FIT activity into a native multi_sport FIT file.
+    1) First tries exact FitContributor `ms_sport` lap splitting.
+    2) If no `ms_sport` developer fields are present, maps laps evenly to the requested
+       profile (Triathlon: Swim/Bike/Run, Duathlon: Run/Bike/Run, Swimrun, Aquathlon).
+    """
+    if try_split_continuous_fit(fit_path, output_path):
+        return
+
+    fit = FitFile.from_file(str(fit_path))
+    laps: List[LapMessage] = []
+    all_records: List[RecordMessage] = []
+    file_id: Optional[FileIdMessage] = None
+
+    for rec in fit.records:
+        msg = rec.message
+        if isinstance(msg, FileIdMessage) and file_id is None:
+            file_id = msg
+        elif isinstance(msg, RecordMessage):
+            all_records.append(msg)
+        elif isinstance(msg, LapMessage):
+            laps.append(msg)
+
+    if file_id is None:
+        raise ValueError("Invalid FIT file: missing FileIdMessage")
+
+    profile_lower = (profile_name or "Triathlon").lower()
+    if "duathlon" in profile_lower:
+        sport_seq = [(Sport.RUNNING, SubSport.GENERIC), (Sport.CYCLING, SubSport.GENERIC), (Sport.RUNNING, SubSport.GENERIC)]
+    elif "swimrun" in profile_lower:
+        sport_seq = [(Sport.SWIMMING, SubSport.OPEN_WATER), (Sport.RUNNING, SubSport.GENERIC), (Sport.SWIMMING, SubSport.OPEN_WATER), (Sport.RUNNING, SubSport.GENERIC)]
+    elif "aquathlon" in profile_lower:
+        sport_seq = [(Sport.SWIMMING, SubSport.OPEN_WATER), (Sport.RUNNING, SubSport.GENERIC)]
+    else:
+        # Default Triathlon (with T1/T2 if 5+ laps, else 3 legs Swim/Bike/Run)
+        if len(laps) >= 5:
+            sport_seq = [
+                (Sport.SWIMMING, SubSport.OPEN_WATER),
+                (Sport.TRANSITION, SubSport.SWIM_TO_BIKE_TRANSITION),
+                (Sport.CYCLING, SubSport.GENERIC),
+                (Sport.TRANSITION, SubSport.BIKE_TO_RUN_TRANSITION),
+                (Sport.RUNNING, SubSport.GENERIC),
+            ]
+        else:
+            sport_seq = [
+                (Sport.SWIMMING, SubSport.OPEN_WATER),
+                (Sport.CYCLING, SubSport.GENERIC),
+                (Sport.RUNNING, SubSport.GENERIC),
+            ]
+
+    builder = FitFileBuilder(auto_define=True, min_string_size=50)
+    if getattr(file_id, "time_created", None):
+        file_id.time_created = int(file_id.time_created) + 2000
+    builder.add(file_id)
+
+    n_legs = len(sport_seq)
+    if len(laps) >= n_legs:
+        # Distribute laps across legs
+        lap_groups = [laps[i::n_legs] for i in range(n_legs)]
+        # Keep chronological contiguity instead of striding
+        chunk = max(1, len(laps) // n_legs)
+        lap_groups = []
+        for i in range(n_legs):
+            s_i = i * chunk
+            e_i = len(laps) if i == n_legs - 1 else (i + 1) * chunk
+            lap_groups.append(laps[s_i:e_i])
+    else:
+        # Split records evenly by time across n_legs
+        lap_groups = []
+
+    total_timer = 0.0
+    last_ts = None
+    lap_idx = 0
+
+    if lap_groups:
+        for idx, (fit_sport, fit_sub) in enumerate(sport_seq):
+            leg_laps = lap_groups[idx]
+            leg_start = leg_laps[0].start_time or leg_laps[0].timestamp
+            leg_end = leg_laps[-1].timestamp or leg_start
+            first_lap_idx = lap_idx
+
+            ev_s = EventMessage()
+            ev_s.timestamp = leg_start
+            ev_s.event = Event.TIMER
+            ev_s.event_type = EventType.START
+            builder.add(ev_s)
+
+            for r in all_records:
+                if r.timestamp is not None and leg_start is not None and leg_end is not None:
+                    if leg_start <= r.timestamp <= leg_end:
+                        builder.add(r)
+
+            ev_e = EventMessage()
+            ev_e.timestamp = leg_end
+            ev_e.event = Event.TIMER
+            ev_e.event_type = EventType.STOP_ALL
+            builder.add(ev_e)
+
+            leg_timer = 0.0
+            leg_dist = 0.0
+            for lm in leg_laps:
+                lm.message_index = lap_idx
+                lm.event = Event.LAP
+                lm.event_type = EventType.STOP
+                lm.sport = fit_sport
+                lm.sub_sport = fit_sub
+                builder.add(lm)
+                lap_idx += 1
+                if getattr(lm, "total_timer_time", None):
+                    leg_timer += float(lm.total_timer_time)
+                if getattr(lm, "total_distance", None):
+                    leg_dist += float(lm.total_distance)
+
+            sess = SessionMessage()
+            sess.message_index = idx
+            sess.event = Event.SESSION
+            sess.event_type = EventType.STOP
+            sess.timestamp = leg_end
+            sess.start_time = leg_start
+            sess.total_elapsed_time = leg_timer
+            sess.total_timer_time = leg_timer
+            sess.total_distance = leg_dist
+            sess.sport = fit_sport
+            sess.sub_sport = fit_sub
+            sess.first_lap_index = first_lap_idx
+            sess.num_laps = len(leg_laps)
+            builder.add(sess)
+
+            total_timer += leg_timer
+            last_ts = leg_end
+    else:
+        # Even record split fallback
+        if not all_records:
+            raise ValueError("No records found in FIT file to split")
+        chunk_r = max(1, len(all_records) // n_legs)
+        for idx, (fit_sport, fit_sub) in enumerate(sport_seq):
+            s_i = idx * chunk_r
+            e_i = len(all_records) if idx == n_legs - 1 else min(len(all_records), (idx + 1) * chunk_r)
+            seg_recs = all_records[s_i:e_i]
+            if not seg_recs:
+                continue
+            leg_start = seg_recs[0].timestamp
+            leg_end = seg_recs[-1].timestamp
+            leg_timer = max(1.0, float((leg_end - leg_start) / 1000.0)) if (leg_start and leg_end) else 60.0
+            d0 = float(seg_recs[0].distance or 0.0)
+            d1 = float(seg_recs[-1].distance or d0)
+            leg_dist = max(0.0, d1 - d0)
+
+            ev_s = EventMessage()
+            ev_s.timestamp = leg_start
+            ev_s.event = Event.TIMER
+            ev_s.event_type = EventType.START
+            builder.add(ev_s)
+            for r in seg_recs:
+                builder.add(r)
+            ev_e = EventMessage()
+            ev_e.timestamp = leg_end
+            ev_e.event = Event.TIMER
+            ev_e.event_type = EventType.STOP_ALL
+            builder.add(ev_e)
+
+            lap = LapMessage()
+            lap.message_index = idx
+            lap.event = Event.LAP
+            lap.event_type = EventType.STOP
+            lap.timestamp = leg_end
+            lap.start_time = leg_start
+            lap.total_elapsed_time = leg_timer
+            lap.total_timer_time = leg_timer
+            lap.total_distance = leg_dist
+            lap.sport = fit_sport
+            lap.sub_sport = fit_sub
+            builder.add(lap)
+
+            sess = SessionMessage()
+            sess.message_index = idx
+            sess.event = Event.SESSION
+            sess.event_type = EventType.STOP
+            sess.timestamp = leg_end
+            sess.start_time = leg_start
+            sess.total_elapsed_time = leg_timer
+            sess.total_timer_time = leg_timer
+            sess.total_distance = leg_dist
+            sess.sport = fit_sport
+            sess.sub_sport = fit_sub
+            sess.first_lap_index = idx
+            sess.num_laps = 1
+            builder.add(sess)
+
+            total_timer += leg_timer
+            last_ts = leg_end
+
+    act = ActivityMessage()
+    if last_ts is not None:
+        act.timestamp = last_ts
+    act.event = Event.ACTIVITY
+    act.event_type = EventType.STOP
+    act.total_timer_time = total_timer
+    act.num_sessions = n_legs
+    act.type = Activity.MANUAL
+    builder.add(act)
+
+    builder.build().to_file(str(output_path))
+
+
 def main() -> int:
     email = os.environ.get("GARMIN_EMAIL", "").strip()
     password = os.environ.get("GARMIN_PASSWORD", "").strip()
     test_upload = os.environ.get("TEST_UPLOAD", "false").lower() == "true"
+    target_ids_raw = os.environ.get("ACTIVITY_IDS", "").strip()
+    target_profile = os.environ.get("TARGET_PROFILE", "Triathlon").strip() or "Triathlon"
+    export_json_path = os.environ.get("EXPORT_JSON_PATH", "docs/data/activities.json").strip()
 
     if not email or not password:
         print("ERROR: GARMIN_EMAIL and GARMIN_PASSWORD environment variables must be set.", file=sys.stderr)
@@ -506,6 +758,36 @@ def main() -> int:
     work_dir = Path("tmp_fits")
     work_dir.mkdir(exist_ok=True)
 
+    # Targeted manual conversion triggered directly from the PWA!
+    if target_ids_raw:
+        ids = [x.strip() for x in target_ids_raw.split(",") if x.strip()]
+        print(f"Manual PWA conversion requested: profile={target_profile}, activity_ids={ids}")
+        if len(ids) == 1:
+            aid = ids[0]
+            zip_bytes = client.download_activity(aid, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
+            raw_path = work_dir / f"manual_{aid}.fit"
+            raw_path.write_bytes(extract_fit_from_zip(zip_bytes))
+            out_path = work_dir / f"manual_{aid}_{target_profile.lower()}.fit"
+            force_convert_single_fit_to_profile(raw_path, target_profile, out_path)
+            print(f"Uploading converted {target_profile} FIT ({out_path.stat().st_size} bytes)...")
+            resp = client.upload_activity(str(out_path))
+            print(f"Manual upload response: {resp}")
+        elif len(ids) >= 2:
+            fit_paths: List[Path] = []
+            cats: List[str] = []
+            for idx, aid in enumerate(ids):
+                zip_bytes = client.download_activity(aid, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
+                p = work_dir / f"manual_leg{idx + 1}_{aid}.fit"
+                p.write_bytes(extract_fit_from_zip(zip_bytes))
+                fit_paths.append(p)
+                cats.append("other")
+            out_path = work_dir / f"manual_merged_{target_profile.lower()}.fit"
+            merge_fit_files(fit_paths, cats, out_path)
+            print(f"Uploading merged {target_profile} FIT ({out_path.stat().st_size} bytes)...")
+            resp = client.upload_activity(str(out_path))
+            print(f"Manual merge upload response: {resp}")
+        time.sleep(5)
+
     # Optional test mode: upload a synthetic 5-leg Triathlon FIT and VERIFY it appears on Garmin Connect
     if test_upload:
         test_fit = work_dir / "test_triathlon_multisport.fit"
@@ -515,18 +797,14 @@ def main() -> int:
         resp = client.upload_activity(str(test_fit))
         print(f"Test upload response: {resp}")
         time.sleep(6)
-        check_acts = client.get_activities(0, 5)
-        print("Verification — top 5 activities AFTER test upload:")
-        for ca in check_acts:
-            ckey = (ca.get("activityType") or {}).get("typeKey", "?")
-            print(f"  * [{ca.get('activityId')}] {ca.get('startTimeGMT')} | {ckey} | {ca.get('duration', 0):.0f}s | {ca.get('activityName')}")
 
-    # Inspect recent activities and merge any consecutive multisport chains (NEVER deleting originals!)
-    activities = client.get_activities(0, 30)
-    print(f"Fetched {len(activities)} recent activities:")
-    for act in activities[:10]:
-        tkey = (act.get("activityType") or {}).get("typeKey", "?")
-        print(f"  - [{act.get('activityId')}] {act.get('startTimeGMT')} | {tkey} | {act.get('duration', 0):.0f}s | {act.get('activityName')}")
+    # Inspect recent activities (NEVER deleting originals!)
+    activities = client.get_activities(0, 40)
+    print(f"Fetched {len(activities)} recent activities.")
+
+    # Export dashboard JSON for the offline PWA
+    if export_json_path:
+        export_dashboard_json(activities, Path(export_json_path))
 
     # Mode A: Check recent single-session continuous activities (last 72h) for FitContributor `ms_sport` lap tags
     # Note: Garmin Connect's activity list endpoint often omits `lapCount`, so we inspect recent
