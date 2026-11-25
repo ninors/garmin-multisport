@@ -12,4 +12,7 @@
     <bitmap id="LineRed" filename="line_red.svg" />
     <bitmap id="LineYellow" filename="line_yellow.svg" />
     <bitmap id="LineCyan" filename="line_cyan.svg" />
+    <bitmap id="PauseSelBg" filename="pause_sel_bg.svg" />
+    <bitmap id="GlowDiscardTR" filename="glow_discard_tr.svg" />
+    <bitmap id="GlowCancelBL" filename="glow_cancel_bl.svg" />
 </drawables>

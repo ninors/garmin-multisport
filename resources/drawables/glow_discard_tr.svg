@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="84" height="110" viewBox="0 0 84 110">
+  <defs>
+    <radialGradient id="haloRedTR" cx="88%" cy="48%" r="72%" fx="92%" fy="48%">
+      <stop offset="0%" stop-color="#FF2266" stop-opacity="0.88"/>
+      <stop offset="35%" stop-color="#CC0044" stop-opacity="0.45"/>
+      <stop offset="70%" stop-color="#55001A" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arcRedTR" x1="18%" y1="6%" x2="88%" y2="96%">
+      <stop offset="0%" stop-color="#AA0033" stop-opacity="0"/>
+      <stop offset="22%" stop-color="#FF1155" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#FF7799" stop-opacity="1"/>
+      <stop offset="78%" stop-color="#FF1155" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#AA0033" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M 28 8 A 190 190 0 0 1 78 102 L 46 102 A 164 164 0 0 0 6 24 Z" fill="url(#haloRedTR)"/>
+  <path d="M 25 8 A 189 189 0 0 1 77 102" fill="none" stroke="url(#arcRedTR)" stroke-width="6.5" stroke-linecap="round"/>
+</svg>

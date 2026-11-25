@@ -2,15 +2,31 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// EXACT Forerunner 165 / 965 Native Pause Screen (IMG_0472, IMG_0473, IMG_0474):
+// EXACT Forerunner 165 Native Pause Screen (IMG_0472, IMG_0473, IMG_0474):
 // - Crisp red bezel ring around edge
-// - 3-second cycling top header (DISTANCE -> CHRONO -> FRÉQ. CARD. -> CALORIES)
-// - Blue-gradient FR165 selection highlight bar + cyan left accent + white vector icons
+// - 3-second cycling top header (CHRONO -> DISTANCE -> FRÉQ. CARD. -> CALORIES)
+// - Smooth SVG linear-gradient blue selection highlight + cyan left accent + white vector icons
 // - BACK button stays PAUSED (returns to data screens with red pause border)
-// - Native WatchUi.Confirmation("Ignorer ?") for authentic Garmin OK/Cancel corner buttons
-// - Authentic FR165 "FC récupération" circular cyan 2:00 countdown screen!
+// - EXACT IMG_0474 "Ignorer ?" confirmation screen (Top-Right red/pink glow + Trash for START, Bottom-Left blue glow + X for DOWN/BACK)
+// - Clean single-color bright cyan 2:00 "FC récupération" screen!
 module PauseMenu {
+    var bmpPauseSel as WatchUi.BitmapResource?;
+    var bmpGlowDiscardTR as WatchUi.BitmapResource?;
+    var bmpGlowCancelBL as WatchUi.BitmapResource?;
+    var assetsLoaded as Boolean = false;
+
+    function ensureAssets() as Void {
+        if (assetsLoaded) {
+            return;
+        }
+        assetsLoaded = true;
+        bmpPauseSel = WatchUi.loadResource(Rez.Drawables.PauseSelBg) as WatchUi.BitmapResource;
+        bmpGlowDiscardTR = WatchUi.loadResource(Rez.Drawables.GlowDiscardTR) as WatchUi.BitmapResource;
+        bmpGlowCancelBL = WatchUi.loadResource(Rez.Drawables.GlowCancelBL) as WatchUi.BitmapResource;
+    }
+
     function push(manager as MultisportManager) as Void {
+        ensureAssets();
         var view = new PauseMenuView(manager);
         WatchUi.pushView(view, new PauseMenuDelegate(manager, view), WatchUi.SLIDE_IMMEDIATE);
     }
@@ -58,6 +74,7 @@ class PauseMenuView extends WatchUi.View {
 
     function onUpdate(dc as Dc) as Void {
         Theme.enableAA(dc);
+        PauseMenu.ensureAssets();
         var w = dc.getWidth();
         var h = dc.getHeight();
         var cx = w / 2;
@@ -77,21 +94,14 @@ class PauseMenuView extends WatchUi.View {
             }
             var isSel = (i == selectedIdx);
             if (isSel) {
-                // Authentic FR165 smooth blue-to-black gradient highlight + bright cyan left accent!
-                var barX = 32;
-                var barW = w - 64;
-                var barY = ry - 27;
-                var barH = 54;
-                dc.setColor(0x030B18, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(barX, barY, barW, barH);
-                dc.setColor(0x061936, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(barX, barY, (barW * 3) / 4, barH);
-                dc.setColor(0x0A2B5E, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(barX, barY, barW / 2, barH);
-                dc.setColor(0x0F3E82, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(barX, barY, barW / 4, barH);
-                dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(barX, barY, 5, barH);
+                if (PauseMenu.bmpPauseSel != null) {
+                    dc.drawBitmap(32, ry - 27, PauseMenu.bmpPauseSel as WatchUi.BitmapResource);
+                } else {
+                    dc.setColor(0x0B2344, Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(32, ry - 27, w - 64, 54);
+                    dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(32, ry - 27, 5, 54);
+                }
             }
 
             drawPauseItemIcon(dc, items[i], 82, ry);
@@ -234,36 +244,92 @@ class PauseMenuDelegate extends WatchUi.InputDelegate {
             var recView = new RecoveryHRView(manager);
             WatchUi.pushView(recView, new RecoveryHRDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id == :discard) {
-            // Native Garmin Confirmation ("Ignorer ?") -> renders authentic FR165 corner X / Trash buttons!
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            var confirm = new WatchUi.Confirmation("Ignorer ?");
-            WatchUi.pushView(confirm, new DiscardConfirmDelegate(manager), WatchUi.SLIDE_UP);
+            // EXACT IMG_0474 FR165 Discard Screen (START = Red Trash, DOWN/BACK = Blue Cross)
+            var confView = new DiscardConfirmView();
+            WatchUi.pushView(confView, new DiscardConfirmDelegate(manager), WatchUi.SLIDE_LEFT);
         }
         return true;
     }
 }
 
-class DiscardConfirmDelegate extends WatchUi.ConfirmationDelegate {
+// EXACT Forerunner 165 "Ignorer ?" Screen (IMG_0474):
+// Pure black + Centered "Ignorer ?" + Top-Right Red/Pink glow & Trash (START) + Bottom-Left Blue glow & X (DOWN/BACK)
+class DiscardConfirmView extends WatchUi.View {
+    function initialize() {
+        View.initialize();
+    }
+
+    function onUpdate(dc as Dc) as Void {
+        Theme.enableAA(dc);
+        PauseMenu.ensureAssets();
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var cx = w / 2;
+        var cy = h / 2;
+
+        dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
+        dc.clear();
+
+        // Centered crisp white "Ignorer ?"
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy, Graphics.FONT_MEDIUM, "Ignorer ?", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Top-Right (START button): Red/Pink glow arc + Crisp White Trash Can
+        if (PauseMenu.bmpGlowDiscardTR != null) {
+            dc.drawBitmap(w - 84, 58, PauseMenu.bmpGlowDiscardTR as WatchUi.BitmapResource);
+        }
+        var tx = w - 66;
+        var ty = 120;
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(tx - 9, ty - 8, 18, 3);
+        dc.fillRectangle(tx - 4, ty - 12, 8, 4);
+        dc.fillRoundedRectangle(tx - 7, ty - 4, 14, 16, 2);
+
+        // Bottom-Left (DOWN button): Cyan-Blue glow arc + Crisp White Cross (X)
+        if (PauseMenu.bmpGlowCancelBL != null) {
+            dc.drawBitmap(0, h - 168, PauseMenu.bmpGlowCancelBL as WatchUi.BitmapResource);
+        }
+        var bx = 66;
+        var by = h - 120;
+        dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(4);
+        dc.drawLine(bx - 8, by - 8, bx + 8, by + 8);
+        dc.drawLine(bx + 8, by - 8, bx - 8, by + 8);
+    }
+}
+
+class DiscardConfirmDelegate extends WatchUi.InputDelegate {
     private var manager as MultisportManager;
 
     function initialize(mgr as MultisportManager) {
-        ConfirmationDelegate.initialize();
+        InputDelegate.initialize();
         manager = mgr;
     }
 
-    function onResponse(response as WatchUi.Confirm) as Boolean {
-        if (response == WatchUi.CONFIRM_YES) {
-            // Sets state = STATE_PRE_START & pendingReturnToPreStart = true;
-            // Garmin auto-pops Confirmation back to ActiveDataView, whose onShow() switches cleanly to PreStartView!
+    function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        var k = evt.getKey();
+        if (k == WatchUi.KEY_ENTER) {
+            // Top-Right START button -> Confirm Discard!
             manager.discardAll();
+            // Pop DiscardConfirmView + PauseMenuView -> ActiveDataView.onShow() switches cleanly to PreStartView!
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return true;
+        } else if (k == WatchUi.KEY_DOWN || k == WatchUi.KEY_ESC) {
+            // Bottom-Left DOWN or BACK button -> Cancel & return cleanly to PauseMenu!
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return true;
         }
-        // On CONFIRM_NO, stay PAUSED on data screens (with red pause border)
+        return false;
+    }
+
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
         return true;
     }
 }
 
 // EXACT Forerunner 165 "FC récupération" Screen (IMG_0473):
-// Bright cyan-blue circular countdown ring + Red Heart at top + "Mesure en cours..." + Big 2:00 timer + Live BPM!
+// Single clean bright cyan circular countdown ring (NO dark-blue double ring!) + Red Heart + "Mesure en cours..." + Big 2:00 timer + Live BPM
 class RecoveryHRView extends WatchUi.View {
     private var manager as MultisportManager;
     private var startTick as Number;
@@ -289,25 +355,15 @@ class RecoveryHRView extends WatchUi.View {
         var remSec = 120 - elapsedSec;
         if (remSec < 0) { remSec = 0; }
 
-        // Subtle dark circular track
-        var ringR = cx - 22;
-        dc.setColor(0x0A1B2E, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(10);
-        dc.drawCircle(cx, cy, ringR);
-
-        // Glowing cyan-blue countdown progress arc (sweeps clockwise from 12 o'clock)
+        // Single clean bright cyan countdown arc (sweeps clockwise from 12 o'clock)
+        var ringR = cx - 20;
         var frac = remSec.toFloat() / 120.0f;
         if (frac > 0.01f) {
             var sweepDeg = (frac * 358.0f).toNumber();
             var startDeg = 90;
             var endDeg = (90 - sweepDeg + 360) % 360;
-            // Soft outer blue glow
-            dc.setColor(0x0055AA, Graphics.COLOR_TRANSPARENT);
-            dc.setPenWidth(14);
-            dc.drawArc(cx, cy, ringR, Graphics.ARC_CLOCKWISE, startDeg, endDeg);
-            // Bright crisp cyan inner ring
-            dc.setColor(0x00CCFF, Graphics.COLOR_TRANSPARENT);
-            dc.setPenWidth(6);
+            dc.setColor(0x00BBFF, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(9);
             dc.drawArc(cx, cy, ringR, Graphics.ARC_CLOCKWISE, startDeg, endDeg);
         }
 

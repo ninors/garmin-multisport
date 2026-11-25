@@ -411,10 +411,10 @@ class ActiveDataView extends WatchUi.View {
         GarminComponents.drawFadedHorizontalLine(dc, 134, 24, w - 24, 0x00CCFF, 0x006699, 0x002233);
         GarminComponents.drawFadedHorizontalLine(dc, 260, 24, w - 24, 0x00CCFF, 0x006699, 0x002233);
 
-        // Middle section: CADENCE + HUGE white number
+        // Middle section: CADENCE + crisp number (well-spaced below title!)
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 156, Graphics.FONT_XTINY, "CADENCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, 212, Graphics.FONT_NUMBER_THAI_HOT, cad.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 154, Graphics.FONT_XTINY, "CADENCE", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, 212, Graphics.FONT_NUMBER_MEDIUM, cad.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Bottom section: Runner icon + Stride length ("--" when stopped, "1.14 m" when moving)
         var strideStr = "--";

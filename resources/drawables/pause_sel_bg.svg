@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="326" height="54" viewBox="0 0 326 54">
+  <defs>
+    <linearGradient id="selGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#124B96" stop-opacity="0.95"/>
+      <stop offset="35%" stop-color="#0C2E60" stop-opacity="0.80"/>
+      <stop offset="72%" stop-color="#051329" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="326" height="54" fill="url(#selGrad)"/>
+  <rect x="0" y="0" width="5" height="54" fill="#00CCFF"/>
+</svg>
