@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="252" viewBox="0 0 390 252">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#050B14"/>
+      <stop offset="55%" stop-color="#0E1D30"/>
+      <stop offset="100%" stop-color="#16283E"/>
+    </linearGradient>
+    <linearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.72"/>
+      <stop offset="48%" stop-color="#000000" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.65"/>
+    </linearGradient>
+  </defs>
+  <rect width="390" height="252" fill="url(#sky)"/>
+  <!-- Subtle semi-transparent Swim waves (left) -->
+  <g opacity="0.22" stroke="#55BBFF" fill="none" stroke-width="4" stroke-linecap="round">
+    <path d="M 18 188 Q 48 172 78 188 T 138 188"/>
+    <path d="M 10 212 Q 44 196 78 212 T 146 212"/>
+    <circle cx="96" cy="144" r="10" fill="#55BBFF" stroke="none"/>
+    <path d="M 46 168 L 82 146 L 114 166" stroke-width="8"/>
+  </g>
+  <!-- Subtle semi-transparent Road Bike wheel & frame (right, matching FR965 photo!) -->
+  <g opacity="0.26" stroke="#88AACC" fill="none">
+    <circle cx="292" cy="186" r="54" stroke-width="6"/>
+    <circle cx="292" cy="186" r="46" stroke-width="1.5"/>
+    <circle cx="292" cy="186" r="8" fill="#88AACC"/>
+    <path d="M 292 186 L 266 108 L 326 116 L 292 186" stroke-width="5"/>
+    <path d="M 250 104 L 284 104" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <!-- Subtle semi-transparent Runner leg/stride silhouette (center-left) -->
+  <g opacity="0.22" fill="#7799BB">
+    <circle cx="176" cy="96" r="13"/>
+    <path d="M 174 114 L 154 166 L 134 234 L 152 238 L 172 178 L 200 226 L 216 218 L 184 156 L 194 122 Z"/>
+  </g>
+  <!-- Moody dark vignette overlay so white text stays 100% razor-sharp -->
+  <rect width="390" height="252" fill="url(#vignette)"/>
+</svg>

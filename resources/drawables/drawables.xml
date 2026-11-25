@@ -8,4 +8,8 @@
     <bitmap id="IcCardio" filename="ic_cardio.svg" />
     <bitmap id="GlowTopRight" filename="glow_top_right.svg" />
     <bitmap id="GlowBotRight" filename="glow_bot_right.svg" />
+    <bitmap id="BgTriathlon" filename="bg_triathlon.svg" />
+    <bitmap id="LineRed" filename="line_red.svg" />
+    <bitmap id="LineYellow" filename="line_yellow.svg" />
+    <bitmap id="LineCyan" filename="line_cyan.svg" />
 </drawables>

@@ -644,10 +644,10 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
             }
             return true;
         } else if (k == WatchUi.KEY_DOWN) {
-            view.nextPage();
+            slideToPage((view.currentPage + 1) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_UP);
             return true;
         } else if (k == WatchUi.KEY_UP) {
-            view.prevPage();
+            slideToPage((view.currentPage - 1 + ActiveDataView.TOTAL_PAGES) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_DOWN);
             return true;
         } else if (k == WatchUi.KEY_MENU) {
             if (!manager.isLocked) {
@@ -656,6 +656,13 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
             return true;
         }
         return false;
+    }
+
+    // Native Garmin 60 FPS continuous vertical follow-through slide animation!
+    private function slideToPage(targetPage as Number, transition as WatchUi.SlideType) as Void {
+        var nextV = new ActiveDataView(manager);
+        nextV.currentPage = targetPage;
+        WatchUi.switchToView(nextV, new ActiveDataDelegate(manager, nextV), transition);
     }
 
     // Long-press UP (HOLD on KEY_UP) opens Settings on devices that fire onHold/KEY_MENU
@@ -668,16 +675,16 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
         return true;
     }
 
-    // Touch swipe: ONLY vertical swipe allowed to scroll data screens
+    // Touch swipe: ONLY vertical swipe allowed to scroll data screens with smooth slide animation!
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         if (manager.isLocked) {
             return true;
         }
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_UP) {
-            view.nextPage();
+            slideToPage((view.currentPage + 1) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_UP);
         } else if (dir == WatchUi.SWIPE_DOWN) {
-            view.prevPage();
+            slideToPage((view.currentPage - 1 + ActiveDataView.TOTAL_PAGES) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_DOWN);
         }
         return true;
     }

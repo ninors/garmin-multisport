@@ -6,6 +6,9 @@ class SettingsModel {
     public var transitionsEnabled as Boolean;
     public var autoSportChange as Boolean;
     public var autoPauseEnabled as Boolean;
+    public var lockDeviceEnabled as Boolean;
+    public var repeatEnabled as Boolean;
+    public var multiFileMode as Boolean; // false = 1 activité continue (LiveTrack continu + GitHub), true = 3 activités séparées
     public var swimPoolMode as Boolean;
     public var poolLengthMeters as Number;
     public var autoLapDistanceMeters as Number;
@@ -42,6 +45,9 @@ class SettingsModel {
         transitionsEnabled = loadBool("transitionsEnabled", true);
         autoSportChange = loadBool("autoSportChange", false);
         autoPauseEnabled = loadBool("autoPauseEnabled", false);
+        lockDeviceEnabled = loadBool("lockDeviceEnabled", false);
+        repeatEnabled = loadBool("repeatEnabled", false);
+        multiFileMode = loadBool("multiFileMode", false);
         swimPoolMode = loadBool("swimPoolMode", false);
         poolLengthMeters = loadNumber("poolLengthMeters", 25);
         autoLapDistanceMeters = loadNumber("autoLapDistanceMeters", 1000);
@@ -84,6 +90,9 @@ class SettingsModel {
         Storage.setValue("transitionsEnabled", transitionsEnabled);
         Storage.setValue("autoSportChange", autoSportChange);
         Storage.setValue("autoPauseEnabled", autoPauseEnabled);
+        Storage.setValue("lockDeviceEnabled", lockDeviceEnabled);
+        Storage.setValue("repeatEnabled", repeatEnabled);
+        Storage.setValue("multiFileMode", multiFileMode);
         Storage.setValue("swimPoolMode", swimPoolMode);
         Storage.setValue("poolLengthMeters", poolLengthMeters);
         Storage.setValue("autoLapDistanceMeters", autoLapDistanceMeters);

@@ -335,10 +335,11 @@ class SummaryDelegate extends WatchUi.InputDelegate {
     function onKey(evt as WatchUi.KeyEvent) as Boolean {
         var k = evt.getKey();
         if (k == WatchUi.KEY_DOWN) {
-            view.nextPage();
+            slideToPage((view.page + 1) % view.getTotalPages(), WatchUi.SLIDE_UP);
             return true;
         } else if (k == WatchUi.KEY_UP) {
-            view.prevPage();
+            var tot = view.getTotalPages();
+            slideToPage((view.page - 1 + tot) % tot, WatchUi.SLIDE_DOWN);
             return true;
         } else if (k == WatchUi.KEY_MENU) {
             MainSettingsMenu.push(manager);
@@ -354,6 +355,12 @@ class SummaryDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    private function slideToPage(targetPage as Number, transition as WatchUi.SlideType) as Void {
+        var nextV = new SummaryView(manager);
+        nextV.page = targetPage;
+        WatchUi.switchToView(nextV, new SummaryDelegate(manager, nextV), transition);
+    }
+
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         return true;
     }
@@ -361,9 +368,10 @@ class SummaryDelegate extends WatchUi.InputDelegate {
     function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_UP) {
-            view.nextPage();
+            slideToPage((view.page + 1) % view.getTotalPages(), WatchUi.SLIDE_UP);
         } else if (dir == WatchUi.SWIPE_DOWN) {
-            view.prevPage();
+            var tot = view.getTotalPages();
+            slideToPage((view.page - 1 + tot) % tot, WatchUi.SLIDE_DOWN);
         }
         return true;
     }

@@ -103,10 +103,11 @@ class MultisportManager {
     private var lastAltSample as Float;
     private var hasLastAlt as Boolean;
 
-    // Active continuous FIT recording session (keeps LiveTrack & audio 100% seamless!)
+    // Active FIT recording session (supports BOTH continuous 1-file LiveTrack AND multi-file mode!)
     private var session as ActivityRecording.Session?;
     private var sportLapField as FitContributor.Field?;
     private var feelSessionField as FitContributor.Field?;
+    private var pendingMultiSessionDelay as Number;
     private var timer as Timer.Timer;
     private var segmentStartMs as Number;
     private var segmentStartDistMeters as Float;
@@ -179,6 +180,7 @@ class MultisportManager {
         session = null;
         sportLapField = null;
         feelSessionField = null;
+        pendingMultiSessionDelay = 0;
         segmentStartMs = 0;
         segmentStartDistMeters = 0.0f;
         segmentStartCalories = 0;
@@ -367,32 +369,44 @@ class MultisportManager {
             return true;
         }
 
-        // Seamless lap marker inside the single continuous session!
-        if (session != null && session.isRecording()) {
-            session.addLap();
+        // Mode 1: Multi-file separate sessions (each sport saves its own .FIT + LiveTrack)
+        if (settings.multiFileMode) {
+            finalizeContinuousSession(true);
+            currentLegIndex++;
+            state = STATE_ACTIVE;
+            autoSportMatchTicks = 0;
+            hrZones = loadHrZonesForSport(getCurrentSport());
+            segmentStartMs = System.getTimer();
+            accumulatedPauseMs = 0;
+            segmentStartDistMeters = 0.0f;
+            segmentStartCalories = 0;
+            lastSessionDist = 0.0f;
+            lapStartElapsedMs = 0;
+            lapStartDistMeters = 0.0f;
+            lastAutoLapDistMeters = 0.0f;
+            pendingMultiSessionDelay = 2; // Wait 2s for async FIT flush before opening next leg session
+            triggerVibeOnly(100);
+        } else {
+            // Mode 0 (default): Single continuous session with Lap sport tags (LiveTrack non-stop, 0 double-beep!)
+            if (session != null && session.isRecording()) {
+                session.addLap();
+            }
+            currentLegIndex++;
+            state = STATE_ACTIVE;
+            autoSportMatchTicks = 0;
+            hrZones = loadHrZonesForSport(getCurrentSport());
+            segmentStartMs = System.getTimer();
+            accumulatedPauseMs = 0;
+            segmentStartDistMeters = lastSessionDist;
+            segmentStartCalories = totalCalories;
+            lapStartElapsedMs = 0;
+            lapStartDistMeters = 0.0f;
+            lastAutoLapDistMeters = 0.0f;
+            if (sportLapField != null) {
+                sportLapField.setData(getCurrentSport());
+            }
+            triggerFeedback(Attention.TONE_LAP, 100);
         }
-
-        currentLegIndex++;
-        state = STATE_ACTIVE;
-        autoSportMatchTicks = 0;
-        hrZones = loadHrZonesForSport(getCurrentSport());
-
-        // Reset per-segment baseline offsets from the continuous session
-        segmentStartMs = System.getTimer();
-        accumulatedPauseMs = 0;
-        segmentStartDistMeters = lastSessionDist;
-        segmentStartCalories = totalCalories;
-        lapStartElapsedMs = 0;
-        lapStartDistMeters = 0.0f;
-        lastAutoLapDistMeters = 0.0f;
-
-        // Pre-tag the new lap with the new sport
-        if (sportLapField != null) {
-            sportLapField.setData(getCurrentSport());
-        }
-
-        // Single clean lap feedback (no Stop/Start double tone!)
-        triggerFeedback(Attention.TONE_LAP, 100);
 
         var nextSport = getCurrentSport();
         var title = SportDefinitions.isTransition(nextSport)
@@ -490,13 +504,15 @@ class MultisportManager {
         lastAutoLapDistMeters = 0.0f;
         lastSessionDist = 0.0f;
 
-        var sessionName = "MS " + msGroupId + " " + SportDefinitions.getProfileName(settings.profileId);
-        // Record the single continuous session as SPORT_RUNNING (100% supported on fr165m with full GPS/HR/LiveTrack;
-        // Garmin firmware rejects SPORT_MULTISPORT on fr165m, and our GitHub script splits laps via ms_sport into native multi_sport).
+        var sessionName = settings.multiFileMode
+            ? ("MS " + msGroupId + " " + (currentLegIndex + 1).toString() + "-" + legs.size().toString() + " " + SportDefinitions.getFitSafeTag(sport))
+            : ("MS " + msGroupId + " " + SportDefinitions.getProfileName(settings.profileId));
+        var fitSport = settings.multiFileMode ? SportDefinitions.getFitSport(sport) : Activity.SPORT_RUNNING;
+        var fitSub = settings.multiFileMode ? SportDefinitions.getFitSubSport(sport) : Activity.SUB_SPORT_GENERIC;
         var opts = {
             :name => sessionName,
-            :sport => Activity.SPORT_RUNNING,
-            :subSport => Activity.SUB_SPORT_GENERIC
+            :sport => fitSport,
+            :subSport => fitSub
         };
 
         try {
@@ -642,6 +658,12 @@ class MultisportManager {
         }
 
         if (state == STATE_ACTIVE) {
+            if (pendingMultiSessionDelay > 0 && session == null) {
+                pendingMultiSessionDelay--;
+                if (pendingMultiSessionDelay == 0) {
+                    startContinuousSession();
+                }
+            }
             checkAutoPause();
             if (!autoPaused) {
                 updateActiveMetrics();

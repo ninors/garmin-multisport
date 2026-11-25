@@ -9,6 +9,10 @@ module GarminComponents {
 
     var bmpGlowTR as WatchUi.BitmapResource?;
     var bmpGlowBR as WatchUi.BitmapResource?;
+    var bmpLineRed as WatchUi.BitmapResource?;
+    var bmpLineYellow as WatchUi.BitmapResource?;
+    var bmpLineCyan as WatchUi.BitmapResource?;
+    var bmpBgTri as WatchUi.BitmapResource?;
     var glowsLoaded as Boolean = false;
 
     function ensureGlows() as Void {
@@ -18,6 +22,10 @@ module GarminComponents {
         glowsLoaded = true;
         bmpGlowTR = WatchUi.loadResource(Rez.Drawables.GlowTopRight) as WatchUi.BitmapResource;
         bmpGlowBR = WatchUi.loadResource(Rez.Drawables.GlowBotRight) as WatchUi.BitmapResource;
+        bmpLineRed = WatchUi.loadResource(Rez.Drawables.LineRed) as WatchUi.BitmapResource;
+        bmpLineYellow = WatchUi.loadResource(Rez.Drawables.LineYellow) as WatchUi.BitmapResource;
+        bmpLineCyan = WatchUi.loadResource(Rez.Drawables.LineCyan) as WatchUi.BitmapResource;
+        bmpBgTri = WatchUi.loadResource(Rez.Drawables.BgTriathlon) as WatchUi.BitmapResource;
     }
 
     // Top 5-zone HR arc (Pre-Start screen)
@@ -57,40 +65,23 @@ module GarminComponents {
         dc.drawText(startX + 22, 44, Theme.fMedium as Graphics.FontType, hrText, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Signature FR965 Smooth 7-Step Faded Horizontal Divider Line (used on ALL red/yellow lines!)
+    // Signature FR965 True SVG Gradient Horizontal Divider Line (Red / Yellow / Cyan)
     function drawFadedHorizontalLine(dc as Dc, y as Number, x1 as Number, x2 as Number, brightColor as Number, midColor as Number, dimColor as Number) as Void {
-        var span = x2 - x1;
-        var s1 = span / 16;
-        var s2 = span / 8;
-        var s3 = (span * 3) / 16;
-        var s4 = span / 4;
-
-        dc.setPenWidth(3);
-        // Very dark outer tips
-        var darkTip = ((dimColor >> 1) & 0x7F7F7F);
-        dc.setColor(darkTip, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1, y, x1 + s1, y);
-        dc.drawLine(x2 - s1, y, x2, y);
-
-        // Dim step
-        dc.setColor(dimColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1 + s1, y, x1 + s2, y);
-        dc.drawLine(x2 - s2, y, x2 - s1, y);
-
-        // Mid step
-        dc.setColor(midColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1 + s2, y, x1 + s3, y);
-        dc.drawLine(x2 - s3, y, x2 - s2, y);
-
-        // Semi-bright step
-        var semiBright = (((brightColor & 0xFEFEFE) >> 1) + ((midColor & 0xFEFEFE) >> 1));
-        dc.setColor(semiBright, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1 + s3, y, x1 + s4, y);
-        dc.drawLine(x2 - s4, y, x2 - s3, y);
-
-        // Bright crisp center
+        ensureGlows();
+        var bmp = bmpLineRed;
+        if (brightColor == 0xFFCC00) {
+            bmp = bmpLineYellow;
+        } else if (brightColor == 0x00CCFF || brightColor == 0x00AAFF || brightColor == 0xFF0055) {
+            bmp = bmpLineCyan;
+        }
+        if (bmp != null) {
+            var lx = (dc.getWidth() - bmp.getWidth()) / 2;
+            dc.drawBitmap(lx, y - 2, bmp);
+            return;
+        }
         dc.setColor(brightColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x1 + s4, y, x2 - s4, y);
+        dc.setPenWidth(3);
+        dc.drawLine(x1, y, x2, y);
     }
 
     // Bottom 5-zone HR arc — EXACT Forerunner 965 style (thin inactive zones, THICK active zone + white vertical tick!)

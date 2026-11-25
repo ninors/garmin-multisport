@@ -19,20 +19,18 @@ class PreStartView extends WatchUi.View {
         var cx = w / 2;
         var cy = h / 2;
 
-        // 1. Pure black top half + deep Garmin dark-navy bottom half (matching native FR965 photo)
+        // 1. Semi-transparent Triathlon Hero SVG backdrop in top half (matching FR965 photo!)
         dc.setColor(Theme.COLOR_BG, Theme.COLOR_BG);
         dc.clear();
 
-        var splitY = 264;
-        // Subtle stylized dark background lines in top half
-        dc.setColor(0x141414, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(40, 152, w - 40, 152);
-        dc.drawLine(30, 178, w - 30, 178);
-        dc.drawLine(25, 224, w - 25, 224);
+        var splitY = 252;
+        GarminComponents.ensureGlows();
+        if (GarminComponents.bmpBgTri != null) {
+            dc.drawBitmap(0, 0, GarminComponents.bmpBgTri);
+        }
 
-        // Deep dark-navy tint for compact bottom rounded cap
-        dc.setColor(0x0A1622, Graphics.COLOR_TRANSPARENT);
+        // Deep dark-navy bottom rounded cap (matching FR965 Triathlon photo)
+        dc.setColor(0x071422, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, splitY, w, h - splitY);
 
         // 2. Top-center: Exact 3 overlapping Garmin Multisport rings (Red, Blue, Green)
@@ -101,8 +99,8 @@ class PreStartView extends WatchUi.View {
         dc.fillCircle(22, cy, 3);
         dc.fillCircle(24, cy + 12, 3);
 
-        // 7. Signature Bright Magenta/Red Smooth Faded Horizontal Divider Line
-        GarminComponents.drawFadedHorizontalLine(dc, splitY, 16, w - 16, 0xFF0055, 0x88002B, 0x2A000E);
+        // 7. Signature Bright Cyan-Blue SVG Gradient Horizontal Divider (exact FR965 Triathlon photo!)
+        GarminComponents.drawFadedHorizontalLine(dc, splitY, 12, w - 12, 0x00CCFF, 0x006699, 0x002233);
 
         // 8. Compact Bottom Cap: Clock + Small Green Battery Icon
         var clock = System.getClockTime();
@@ -111,16 +109,16 @@ class PreStartView extends WatchUi.View {
         var battPct = stats.battery.toNumber();
 
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - 16, 286, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        SportIcons.drawBatteryIcon(dc, cx + 20, 280, 20, 11, battPct);
+        dc.drawText(cx - 16, 278, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        SportIcons.drawBatteryIcon(dc, cx + 20, 272, 20, 11, battPct);
 
         // 9. Smaller sleek White 0:00 with Superscript 00 Hundredths
         var mainZero = "0:00";
         var zeroW = dc.getTextWidthInPixels(mainZero, Graphics.FONT_MEDIUM);
         var zeroLeft = cx - (zeroW / 2) - 8;
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(zeroLeft, 324, Graphics.FONT_MEDIUM, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(zeroLeft + zeroW + 3, 315, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft, 318, Graphics.FONT_MEDIUM, mainZero, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(zeroLeft + zeroW + 3, 309, Graphics.FONT_XTINY, "00", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // 10. Bottom Downward White Chevron "v"
         dc.setColor(Theme.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
