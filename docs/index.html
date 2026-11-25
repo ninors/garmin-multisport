@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#FFFFFF" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Multisport" />
@@ -145,7 +146,7 @@
         </div>
         <p class="helper-text">
           Pour déclencher la conversion Multisport vers Garmin Connect directement depuis l'application, colle ton jeton GitHub une seule fois ci-dessous (stocké localement et de façon persistante sur ton appareil).
-          <a href="https://github.com/settings/tokens/new?scopes=workflow&description=Multisport%20PWA" target="_blank" rel="noopener" class="text-link">Créer un jeton (scope workflow) ↗</a>
+          <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=Multisport%20PWA" target="_blank" rel="noopener" class="text-link">Créer un jeton (scopes repo + workflow) ↗</a>
         </p>
         <label class="field-label" for="inputGhRepo">Dépôt GitHub</label>
         <input id="inputGhRepo" class="field-input" type="text" value="ninors/garmin-multisport" />

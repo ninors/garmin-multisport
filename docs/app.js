@@ -336,7 +336,7 @@
         pollWorkflowUntilDone(repo, token);
         return true;
       }
-      showToast(`Erreur GitHub (${res.status}) : vérifie le jeton (scope workflow).`);
+      showToast(`Erreur GitHub (${res.status}) : coche bien repo + workflow sur le jeton.`);
       return false;
     } catch (_) {
       showToast("Impossible de joindre GitHub.");
