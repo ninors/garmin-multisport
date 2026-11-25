@@ -20,9 +20,10 @@ class ActiveDataView extends WatchUi.View {
         dotsVisibleUntilTick = mgr.tickCount + 3;
     }
 
-    // Safely transition back to PreStartView AFTER Confirmation dialog pops on Discard!
+    // Safely transition back to PreStartView AFTER Discard confirms!
     function onShow() as Void {
-        if (manager.state == MultisportManager.STATE_PRE_START) {
+        if (manager.state == MultisportManager.STATE_PRE_START && manager.pendingReturnToPreStart) {
+            manager.pendingReturnToPreStart = false;
             var preView = new PreStartView(manager);
             var preDel = new PreStartDelegate(manager);
             WatchUi.switchToView(preView, preDel, WatchUi.SLIDE_RIGHT);
@@ -617,7 +618,13 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
             return true;
         }
         if (k == WatchUi.KEY_ENTER) {
-            // Physical START/STOP -> Pause & Open PauseMenu
+            // If previewing data screens from Pre-Start, START launches the activity immediately!
+            if (manager.state == MultisportManager.STATE_PRE_START) {
+                manager.startActivity();
+                WatchUi.requestUpdate();
+                return true;
+            }
+            // Physical START/STOP -> Pause (if active) & Open PauseMenu
             if (manager.isLocked) {
                 manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
                 WatchUi.requestUpdate();
@@ -629,6 +636,12 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
             PauseMenu.push(manager);
             return true;
         } else if (k == WatchUi.KEY_ESC) {
+            // If previewing from Pre-Start, BACK returns smoothly to PreStartView!
+            if (manager.state == MultisportManager.STATE_PRE_START) {
+                var preV = new PreStartView(manager);
+                WatchUi.switchToView(preV, new PreStartDelegate(manager), WatchUi.SLIDE_DOWN);
+                return true;
+            }
             // Physical BACK/LAP -> Next segment / transition
             if (manager.isLocked) {
                 manager.showAlert("VERROUILLÉ", "Appui LIGHT", 2);
@@ -647,6 +660,12 @@ class ActiveDataDelegate extends WatchUi.InputDelegate {
             slideToPage((view.currentPage + 1) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_UP);
             return true;
         } else if (k == WatchUi.KEY_UP) {
+            // When previewing from Pre-Start, UP on Page 0 returns smoothly to PreStartView!
+            if (manager.state == MultisportManager.STATE_PRE_START && view.currentPage == 0) {
+                var preV2 = new PreStartView(manager);
+                WatchUi.switchToView(preV2, new PreStartDelegate(manager), WatchUi.SLIDE_DOWN);
+                return true;
+            }
             slideToPage((view.currentPage - 1 + ActiveDataView.TOTAL_PAGES) % ActiveDataView.TOTAL_PAGES, WatchUi.SLIDE_DOWN);
             return true;
         } else if (k == WatchUi.KEY_MENU) {

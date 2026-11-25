@@ -162,11 +162,10 @@ class PreStartDelegate extends WatchUi.InputDelegate {
             MainSettingsMenu.push(manager);
             return true;
         } else if (k == WatchUi.KEY_DOWN) {
-            // Physical DOWN -> Cycle Multisport Profile
-            manager.settings.profileId = (manager.settings.profileId + 1) % 5;
-            manager.settings.save();
-            manager.rebuildProfile();
-            WatchUi.requestUpdate();
+            // Physical DOWN -> Preview live data screens BEFORE starting the activity (exact FR965!)
+            var previewView = new ActiveDataView(manager);
+            previewView.currentPage = 0;
+            WatchUi.switchToView(previewView, new ActiveDataDelegate(manager, previewView), WatchUi.SLIDE_UP);
             return true;
         }
         return false;

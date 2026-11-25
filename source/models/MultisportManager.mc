@@ -85,6 +85,7 @@ class MultisportManager {
 
     // Lock state (LIGHT button long/toggle)
     public var isLocked as Boolean;
+    public var pendingReturnToPreStart as Boolean;
 
     // GPS track ring buffer (max 160 points for low RAM, tagged with sport for multi-color map!)
     public static const MAX_TRACK_POINTS = 160;
@@ -163,6 +164,7 @@ class MultisportManager {
         autoPauseMoveTicks = 0;
         feelRating = 3;
         isLocked = false;
+        pendingReturnToPreStart = false;
 
         trackLats = [] as Array<Float>;
         trackLons = [] as Array<Float>;
@@ -493,6 +495,7 @@ class MultisportManager {
     public function discardAll() as Void {
         finalizeContinuousSession(false);
         state = STATE_PRE_START;
+        pendingReturnToPreStart = true;
         totalElapsedMs = 0;
         totalDistanceMeters = 0.0f;
         totalCalories = 0;
