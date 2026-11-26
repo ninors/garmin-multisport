@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-11-25T20:07:51.537296+00:00",
+  "updatedAt": "2026-11-26T02:42:12.858325+00:00",
   "totalCount": 40,
   "activities": [
     {
-      "id": "25199077896",
+      "id": "25199973865",
       "name": "Course à pied",
       "typeKey": "running",
       "category": "run",
@@ -18,16 +18,16 @@
       "load": 0
     },
     {
-      "id": "25199176972",
-      "name": "Multisport",
-      "typeKey": "multi_sport",
-      "category": "multisport",
-      "startTimeLocal": "2026-11-25 20:58:16",
-      "startTimeGMT": "2026-11-25 19:58:16",
-      "durationSec": 11,
-      "distanceMeters": 0.0,
-      "avgHr": 0,
-      "maxHr": 64,
+      "id": "25199973838",
+      "name": "Vitré Course à pied",
+      "typeKey": "running",
+      "category": "run",
+      "startTimeLocal": "2026-11-24 21:08:52",
+      "startTimeGMT": "2026-11-24 20:08:52",
+      "durationSec": 36,
+      "distanceMeters": 2.5,
+      "avgHr": 72,
+      "maxHr": 75,
       "calories": 0,
       "elevationGain": 0.0,
       "load": 0
